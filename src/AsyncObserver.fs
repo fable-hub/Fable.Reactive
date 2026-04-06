@@ -46,7 +46,7 @@ module AsyncObserver =
     /// (OnNext* (OnError|OnCompleted)?) is not violated.
     let safeObserver (obv: IAsyncObserver<'TSource>) (disposable: IReactiveDisposable) : IAsyncObserver<'TSource> =
         let agent =
-            spawn (fun inbox ->
+            Actor.spawn (fun inbox ->
                 let rec messageLoop stopped =
                     async {
                         let! n = inbox.Receive()
@@ -92,7 +92,7 @@ module AsyncObserver =
         (obv: IAsyncObserver<'TSource>)
         : IAsyncObserver<'TSource> * (Async<IReactiveDisposable> -> Async<IReactiveDisposable>) =
         let agent =
-            spawn (fun inbox ->
+            Actor.spawn (fun inbox ->
                 let rec messageLoop disposables =
                     async {
                         let! cmd = inbox.Receive()

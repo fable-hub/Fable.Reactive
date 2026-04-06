@@ -28,15 +28,18 @@ restore:
 
 # --- Packaging ---
 
-# Create NuGet package
+# Create NuGet packages with versions from changelog
 pack:
-    dotnet build {{src_path}}
-    dotnet pack {{src_path}} -c Release
+    #!/usr/bin/env bash
+    set -euo pipefail
+    get_version() { grep -m1 '^## ' "$1" | sed 's/^## \([^ ]*\).*/\1/'; }
+    VERSION=$(get_version CHANGELOG.md)
+    dotnet pack {{src_path}} -c Release -o ./nupkgs -p:PackageVersion=$VERSION -p:InformationalVersion=$VERSION
+    dotnet pack extra/AsyncSeq -c Release -o ./nupkgs -p:PackageVersion=$VERSION -p:InformationalVersion=$VERSION
 
-# Create NuGet package with specific version (used in CI)
-pack-version version:
-    dotnet pack {{src_path}} -c Release -p:PackageVersion={{version}} -p:InformationalVersion={{version}}
-    dotnet pack extra/AsyncSeq -c Release -p:PackageVersion={{version}} -p:InformationalVersion={{version}}
+# Pack and push all packages to NuGet (used in CI)
+release: pack
+    dotnet nuget push './nupkgs/*.nupkg' -s https://api.nuget.org/v3/index.json -k $NUGET_KEY
 
 # Run EasyBuild.ShipIt for release management
 shipit *args:

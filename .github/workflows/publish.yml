@@ -6,15 +6,41 @@ on:
 
 permissions:
   contents: write
+  pull-requests: write
 
 jobs:
-  publish:
+  shipit-pr:
+    name: ShipIt - Pull Request
+    runs-on: ubuntu-latest
+    if: "!startsWith(github.event.head_commit.message, 'chore: release ')"
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.x
+
+      - name: Install tools
+        run: dotnet tool restore
+
+      - name: ShipIt (Pull Request)
+        run: dotnet shipit --pre-release rc
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  release:
+    name: Release
     runs-on: ubuntu-latest
     timeout-minutes: 10
     if: "startsWith(github.event.head_commit.message, 'chore: release ')"
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
@@ -24,32 +50,12 @@ jobs:
       - name: Install just
         uses: extractions/setup-just@v3
 
-      - name: Extract version
-        id: version
-        run: |
-          MESSAGE="${{ github.event.head_commit.message }}"
-          VERSION="${MESSAGE#chore: release }"
-          VERSION="${VERSION%% *}"
-          # Strip package name prefix (e.g. Fable.Reactive@1.0.0-rc.4 -> 1.0.0-rc.4)
-          VERSION="${VERSION##*@}"
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
-
-      - name: Restore dependencies
+      - name: Install tools
         run: |
           dotnet tool restore
           dotnet restore
 
-      - name: Pack NuGet
-        run: just pack-version ${{ steps.version.outputs.version }}
-
-      - name: Push NuGet
-        run: dotnet nuget push 'src/**/Release/*.nupkg' -s https://api.nuget.org/v3/index.json -k ${{ secrets.NUGET_API_KEY }}
-
-      - name: Push AsyncSeq NuGet
-        run: dotnet nuget push 'extra/**/Release/*.nupkg' -s https://api.nuget.org/v3/index.json -k ${{ secrets.NUGET_API_KEY }}
-
-      - name: Create GitHub Release
-        run: gh release create ${{ steps.version.outputs.tag }} --title "${{ steps.version.outputs.version }}" --generate-notes || echo "Release already exists"
+      - name: Build, pack and push
+        run: just release
         env:
-          GH_TOKEN: ${{ github.token }}
+          NUGET_KEY: ${{ secrets.NUGET_API_KEY }}

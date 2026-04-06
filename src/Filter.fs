@@ -50,7 +50,7 @@ module internal Filter =
             let safeObv, autoDetach = autoDetachObserver aobv
 
             let agent =
-                spawn (fun inbox ->
+                Actor.spawn (fun inbox ->
                     let rec messageLoop (latest: Notification<'TSource>) =
                         async {
                             let! n = inbox.Receive()

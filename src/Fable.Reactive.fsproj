@@ -22,6 +22,7 @@
     <Compile Include="Filter.fs" />
     <Compile Include="Aggregate.fs" />
     <Compile Include="Tap.fs" />
+    <Compile Include="ActorInterop.fs" />
     <Compile Include="AsyncObservable.fs" />
     <Compile Include="Builder.fs" />
   </ItemGroup>

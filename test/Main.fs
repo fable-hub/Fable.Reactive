@@ -16,7 +16,8 @@ let allTests =
           Merge.tests
           Observer.tests
           Scan.tests
-          Timeshift.tests ]
+          Timeshift.tests
+          ActorInterop.tests]
 
 [<EntryPoint>]
 let main argv =

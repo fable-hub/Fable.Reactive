@@ -14,7 +14,7 @@ module internal Subjects =
     /// Notifications arriving before subscription are buffered and replayed.
     let singleSubject<'TSource> () : IAsyncObserver<'TSource> * IAsyncObservable<'TSource> =
         let actor =
-            spawn (fun inbox ->
+            Actor.spawn (fun inbox ->
                 let rec waitForSubscriber (buffer: Notification<'TSource> list) =
                     async {
                         let! msg = inbox.Receive()
@@ -76,7 +76,7 @@ module internal Subjects =
         let obvs = new List<IAsyncObserver<'TSource>>()
 
         let mb =
-            spawn (fun inbox ->
+            Actor.spawn (fun inbox ->
                 let rec messageLoop () =
                     async {
                         let! n = inbox.Receive()

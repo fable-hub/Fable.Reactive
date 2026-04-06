@@ -98,7 +98,7 @@ module internal Aggregation =
         : IAsyncObservable<IAsyncObservable<'TSource>> =
         let subscribeAsync (aobv: IAsyncObserver<IAsyncObservable<'TSource>>) =
             let agent =
-                spawn (fun inbox ->
+                Actor.spawn (fun inbox ->
                     let rec messageLoop ((groups, disposed): Map<'TKey, IAsyncObserver<'TSource>> * bool) =
                         async {
                             let! n = inbox.Receive()

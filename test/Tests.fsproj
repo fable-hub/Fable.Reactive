@@ -22,6 +22,7 @@
     <Compile Include="TakeUntilTest.fs" />
     <Compile Include="AsyncSeqTest.fs" />
     <Compile Include="TimeshiftTest.fs" />
+    <Compile Include="ActorInteropTest.fs" />
 
     <Compile Include="Main.fs" />
   </ItemGroup>

@@ -1,16 +1,5 @@
 
 
-GROUP Reactive
-RESTRICTION: == netstandard2.0
-NUGET
-  remote: https://api.nuget.org/v3/index.json
-    Fable.Actor (5.0.0-rc.2)
-      Fable.Core (>= 5.0.0-rc.1)
-      FSharp.Core (>= 10.1.201)
-    Fable.Core (5.0.0-rc.1)
-      FSharp.Core (>= 4.7.2)
-    FSharp.Core (11.0.100)
-
 GROUP AsyncSeq
 RESTRICTION: == netstandard2.1
 NUGET
@@ -20,6 +9,21 @@ NUGET
       Microsoft.Bcl.AsyncInterfaces (>= 5.0)
     FSharp.Core (11.0.100)
     Microsoft.Bcl.AsyncInterfaces (10.0.2)
+
+GROUP Reactive
+RESTRICTION: == netstandard2.0
+NUGET
+  remote: https://api.nuget.org/v3/index.json
+    Fable.Actor (5.0.0-rc.8)
+      Fable.Beam (>= 5.0.0-rc.22)
+      Fable.Core (>= 5.0.0-rc.1)
+      FSharp.Core (>= 10.1.201)
+    Fable.Beam (5.0.0-rc.22)
+      Fable.Core (5.0.0-rc.1)
+      FSharp.Core (>= 5.0)
+    Fable.Core (5.0.0-rc.1)
+      FSharp.Core (>= 4.7.2)
+    FSharp.Core (10.1.201)
 
 GROUP Test
 RESTRICTION: == net10.0

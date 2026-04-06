@@ -15,7 +15,7 @@ module internal Timeshift =
     let delay (msecs: int) (source: IAsyncObservable<'TSource>) : IAsyncObservable<'TSource> =
         let subscribeAsync (aobv: IAsyncObserver<'TSource>) =
             let agent =
-                spawn (fun inbox ->
+                Actor.spawn (fun inbox ->
                     let rec messageLoop () =
                         async {
                             let! n, dueTime = inbox.Receive()
@@ -66,7 +66,7 @@ module internal Timeshift =
             let cts = new CancellationTokenSource()
 
             let agent =
-                spawn (fun inbox ->
+                Actor.spawn (fun inbox ->
                     let rec messageLoop currentIndex =
                         async {
                             let! n, index = inbox.Receive()

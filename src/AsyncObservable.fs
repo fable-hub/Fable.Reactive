@@ -3,6 +3,7 @@ namespace Fable.Reactive
 open System
 open System.Threading
 open Fable.Actor
+open Fable.Actor.Types
 
 open Fable.Reactive.Core
 
@@ -339,3 +340,39 @@ module Reactive =
     /// Tap synchronously into the stream performing side effects by the given `onNext` action.
     let tapOnNext (onNext: 'a -> unit) (source: IAsyncObservable<'a>) : IAsyncObservable<'a> =
         Tap.tapOnNext onNext source
+
+    // ActorInterop Region
+
+    /// Subscribe an observable to an actor that receives Notification<'T>.
+    let subscribeActor (actor: Actor<Notification<'a>>) (source: IAsyncObservable<'a>) : Async<IReactiveDisposable> =
+        ActorInterop.subscribeActor actor source
+
+    /// For each upstream item, posts it to a supervised per-subscription actor.
+    /// The decider controls crash behavior: Escalate (OnError), Stop (drop), Restart (retry).
+    let flatMapActorSupervised
+        (decide: exn -> Directive)
+        (handler: ('b -> unit) -> Actor<'a> -> ActorOp<unit>)
+        (source: IAsyncObservable<'a>)
+        : IAsyncObservable<'b> =
+        ActorInterop.flatMapActorSupervised decide handler source
+
+    /// For each upstream item, posts it to a per-subscription actor.
+    /// The actor emits downstream via an emit callback. Actor crash → OnError.
+    let flatMapActor
+        (handler: ('b -> unit) -> Actor<'a> -> ActorOp<unit>)
+        (source: IAsyncObservable<'a>)
+        : IAsyncObservable<'b> =
+        ActorInterop.flatMapActor handler source
+
+    /// Stateful 1-to-1 transform using an actor with request-reply.
+    /// Provides backpressure — the pipeline waits for the actor's reply before emitting downstream.
+    let mapActor
+        (handler: 's -> 'a -> 's * 'b)
+        (initialState: 's)
+        (source: IAsyncObservable<'a>)
+        : IAsyncObservable<'b> =
+        ActorInterop.mapActor handler initialState source
+
+    /// Create an actor-backed subject. Returns the actor and an observable.
+    let ofActor (body: ('a -> unit) -> Actor<'msg> -> ActorOp<unit>) : Actor<'msg> * IAsyncObservable<'a> =
+        ActorInterop.ofActor body

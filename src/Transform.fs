@@ -100,7 +100,7 @@ module internal Transform =
                             } }
 
                 let agent =
-                    spawn (fun inbox ->
+                    Actor.spawn (fun inbox ->
                         let rec messageLoop (current: IReactiveDisposable option, isStopped, currentId) =
                             async {
                                 let! cmd = inbox.Receive()
@@ -238,7 +238,7 @@ module internal Transform =
         let dispatch, stream = Subjects.subject<'TSource> ()
 
         let mb =
-            spawn (fun inbox ->
+            Actor.spawn (fun inbox ->
                 let rec messageLoop (count: int) (subscription: IReactiveDisposable) =
                     async {
                         let! cmd = inbox.Receive()
