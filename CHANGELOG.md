@@ -1,11 +1,19 @@
 ---
-last_commit_released: 8278b84003bcb0129afcfb0ff15f3c35ce0dadbe
+last_commit_released: 92de51cf7ea44ad4e87ad802718c558ee9ec6797
 name: Fable.Reactive
 ---
 
 # Changelog
 
 All notable changes to this project will be documented in this file.
+
+## 1.0.0-rc.6 - 2026-04-06
+
+### 🚀 Features
+
+* Add actor interop operators (#22) ([92de51c](https://github.com/dbrattli/Fable.Reactive/commit/92de51cf7ea44ad4e87ad802718c558ee9ec6797))
+
+<strong><small>[View changes on Github](https://github.com/dbrattli/Fable.Reactive/compare/8278b84003bcb0129afcfb0ff15f3c35ce0dadbe..92de51cf7ea44ad4e87ad802718c558ee9ec6797)</small></strong>
 
 ## 1.0.0-rc.5 - 2026-03-14
 
