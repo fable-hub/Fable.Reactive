@@ -322,6 +322,20 @@ module Reactive =
     /// A cold subject that only supports a single subscriber. Will await the caller if no-one is subscribing.
     let singleSubject<'a> () : IAsyncObserver<'a> * IAsyncObservable<'a> = Subjects.singleSubject<'a> ()
 
+    /// <summary>
+    /// A variant of a subject that "replays" old values to new subscribers by emitting them when they first subscribe.
+    /// </summary>
+    /// <remarks>
+    /// A replay subject has an internal buffer that will store a specified number of values that it has observed. Like subject,
+    /// a replay subject "observes" values by having them passed to its next method. When it observes a value, it will store
+    /// that value for a time determined by the configuration of the replay subject, as passed to its constructor.
+    ///
+    /// When a new subscriber subscribes to the replay subject, it will emit all values in its buffer in a First-In-First-Out
+    /// (FIFO) manner. The replay subject will also complete, if it has observed completion; and it will error if it has observed
+    /// an error.
+    /// </remarks>
+    let replaySubject<'a> (bufferSize : int) : IAsyncObserver<'a> * IAsyncObservable<'a> = Subjects.replaySubject<'a> bufferSize
+
     // Tap Region
 
     /// Tap asynchronously into the stream performing side effects by the given async actions.
