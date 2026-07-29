@@ -1,93 +1,106 @@
 module Tests.Create
 
-open System.Threading.Tasks
+open Scriptorium.Quill
+open Scriptorium.Nib.Assertion
+open type Scriptorium.Quill.Test
 
 open Fable.Reactive
-open Expecto
-
 open Tests.Utils
 
-[<Tests>]
-let tests = testList "Create Tests" [
+let tests =
+    testList (
+        "Create",
+        [ testAsync (
+              "single happy",
+              async {
+                  // Arrange
+                  let xs = Reactive.single 42
+                  let obv = TestObserver<int>()
 
-    testAsync "Test single happy" {
-        // Arrange
-        let xs = Reactive.single 42
-        let obv = TestObserver<int> ()
+                  // Act
+                  let! _dispose = xs.SubscribeAsync obv
 
-        // Act
-        let! dispose = xs.SubscribeAsync obv
+                  // Assert
+                  let! latest = obv.Await()
+                  assertThat latest (isEqualTo 42)
 
-        // Assert
-        let! latest = obv.Await ()
-        Expect.equal latest 42 "Should be equal"
+                  let actual = obv.Notifications |> Seq.toList
+                  let expected = [ OnNext 42; OnCompleted ]
 
-        let actual = obv.Notifications |> Seq.toList
-        let expected = [ OnNext 42; OnCompleted ]
+                  assertThat actual (isEqualTo expected)
+              }
+          )
 
-        Expect.equal actual expected "Should be equal"
-    }
+          testAsync (
+              "single dispose right after subscribe does not throw",
+              async {
+                  // Arrange
+                  let xs = Reactive.single 42
+                  let obv = TestObserver<int>()
 
-    testAsync "Test just dispose after subscribe" {
-        // Arrange
-        let xs = Reactive.single 42
-        let obv = TestObserver<int> ()
+                  // Act
+                  let! subscription = xs.SubscribeAsync obv
+                  Async.StartImmediate(subscription.DisposeAsync())
 
-        // Act
-        let! subscription = xs.SubscribeAsync obv
-        Async.StartImmediate (subscription.DisposeAsync ())
+                  // Assert - racing dispose against delivery must not raise
+                  assertThat true isTrue
+              }
+          )
 
-        // Assert
-        //let actual = obv.Notifications |> Seq.toList
-        //Assert.That(actual, Is.EquivalentTo([]))
-        ()
-    }
+          testAsync (
+              "ofSeq empty",
+              async {
+                  // Arrange
+                  let xs = Reactive.ofSeq Seq.empty
+                  let obv = TestObserver<int>()
 
-    testAsync "Test ofSeq empty"  {
-        // Arrange
-        let xs = Reactive.ofSeq Seq.empty
-        let obv = TestObserver<int> ()
+                  // Act
+                  let! _dispose = xs.SubscribeAsync obv
+                  do! obv.AwaitIgnore()
 
-        // Act
-        let! dispose = xs.SubscribeAsync obv
+                  // Assert
+                  let actual = obv.Notifications |> Seq.toList
+                  let expected: Notification<int> list = [ OnCompleted ]
 
-        do! obv.AwaitIgnore ()
+                  assertThat actual (isEqualTo expected)
+              }
+          )
 
-        // Assert
-        let actual = obv.Notifications |> Seq.toList
-        let expected : Notification<int> list = [ OnCompleted ]
+          testAsync (
+              "ofSeq non empty",
+              async {
+                  // Arrange
+                  let xs = seq { 1..5 } |> Reactive.ofSeq
+                  let obv = TestObserver<int>()
 
-        Expect.equal actual expected "Should be equal"
-    }
+                  // Act
+                  let! _dispose = xs.SubscribeAsync obv
+                  do! obv.AwaitIgnore()
 
-    testAsync "Test ofSeq non empty" {
-        // Arrange
-        let xs = seq { 1 .. 5 } |> Reactive.ofSeq
-        let obv = TestObserver<int> ()
+                  // Assert
+                  let actual = obv.Notifications |> Seq.toList
+                  let expected = [ OnNext 1; OnNext 2; OnNext 3; OnNext 4; OnNext 5; OnCompleted ]
 
-        // Act
-        let! dispose = xs.SubscribeAsync obv
-        do! obv.AwaitIgnore ()
+                  assertThat actual (isEqualTo expected)
+              }
+          )
 
-        // Assert
-        let actual = obv.Notifications |> Seq.toList
-        let expected = [ OnNext 1; OnNext 2; OnNext 3; OnNext 4; OnNext 5; OnCompleted ]
+          testAsync (
+              "timer dispose after subscribe",
+              async {
+                  // Arrange
+                  let xs = Reactive.timer 10
+                  let obv = TestObserver<int>()
 
-        Expect.equal actual expected "Should be equal"
-    }
+                  // Act
+                  let! subscription = xs.SubscribeAsync obv
+                  do! subscription.DisposeAsync()
+                  do! Async.Sleep 15
 
-    testAsync "Test dispose after subscribe" {
-        // Arrange
-        let xs = Reactive.timer 10
-        let obv = TestObserver<int> ()
-
-        // Act
-        let! subscription = xs.SubscribeAsync obv
-        do! subscription.DisposeAsync ()
-        do! Async.Sleep 15
-
-        // Assert
-        let actual = obv.Notifications |> Seq.toList
-        Expect.equal actual [] "Should be equal"
-    }
-]
+                  // Assert
+                  do! obv.Refresh()
+                  let actual = obv.Notifications |> Seq.toList
+                  assertThat actual isEmpty
+              }
+          ) ]
+    )

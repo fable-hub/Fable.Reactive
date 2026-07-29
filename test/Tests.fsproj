@@ -20,17 +20,18 @@
     <Compile Include="ScanTest.fs" />
     <Compile Include="SubjectTest.fs" />
     <Compile Include="TakeUntilTest.fs" />
-    <Compile Include="AsyncSeqTest.fs" />
+    <Compile Include="AsyncSeqTest.fs" Condition="'$(FableCompile)' != 'true'" />
     <Compile Include="TimeshiftTest.fs" />
     <Compile Include="ActorInteropTest.fs" />
 
+    <Compile Include="ProbeTest.fs" />
     <Compile Include="Main.fs" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="../src/Fable.Reactive.fsproj" />
   </ItemGroup>
-  <ItemGroup>
+  <ItemGroup Condition="'$(FableCompile)' != 'true'">
     <ProjectReference Include="../extra/AsyncSeq/Fable.Reactive.AsyncSeq.fsproj" />
   </ItemGroup>
 

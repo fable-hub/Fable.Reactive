@@ -1,25 +1,38 @@
 module Tests.Main
 
-open Expecto
+open Scriptorium.Quill
+open type Scriptorium.Quill.Runner
 
-[<Tests>]
-let allTests =
-    testList
-        "all-tests"
-        [ AsyncSeq.tests
-          Bind.tests
-          Catch.tests
-          Concat.tests
-          Create.tests
-          Filter.tests
-          Map.tests
-          Merge.tests
-          Observer.tests
-          Scan.tests
-          Timeshift.tests
-          ActorInterop.tests]
-
+// One runner for every target. Quill knows how to end the process on each platform:
+//
+//   .NET / Python  Async.RunSynchronously, so the value returned here is the process exit code
+//   BEAM           the run is synchronous; Quill calls halt/1, so `erl` exits non-zero on failure
+//   JS / Node      nothing can block, so runTests returns 0 immediately and chains process.exit
+//                  onto the resolved promise — the value returned here is ignored
+//
+// This is a timing-heavy suite (timers, debounce, subjects), so the "slow test" threshold is
+// raised from Quill's 300ms default — several tests sleep on purpose and are not slow at all.
 [<EntryPoint>]
-let main argv =
-    printfn "Running tests!"
-    runTestsWithCLIArgs [] argv allTests
+let main _argv =
+    runTestsWith (
+        slowThreshold 1000,
+        [ Tests.GroupBy.tests
+          Tests.Observer.tests
+          Tests.Create.tests
+          Tests.Filter.tests
+          Tests.Map.tests
+          Tests.Merge.tests
+          Tests.Concat.tests
+          Tests.Bind.tests
+          Tests.Query.tests
+          Tests.Catch.tests
+          Tests.Scan.tests
+          Tests.SubjectTest.tests
+          Tests.TakeUntil.tests
+#if !FABLE_COMPILER
+          Tests.AsyncSeq.tests
+#endif
+          Tests.Timeshift.tests
+          Tests.ActorInterop.tests
+          Tests.Probe.tests ]
+    )

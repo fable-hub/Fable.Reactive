@@ -31,24 +31,55 @@ Allowed types: `feat`, `fix`, `chore`, `docs`, `style`, `refactor`, `perf`, `tes
 
 ## Test Framework
 
-Uses **Expecto** test framework. Tests are in `test/` directory.
+Uses **Scriptorium** — assertions from `Scriptorium.Nib`, the runner from `Scriptorium.Quill`
+(same setup as Fable.Actor and Fable.Giraffe). Tests are in `test/`.
+
+Quill is a plain executable, not a `dotnet test` adapter, so `just test` runs
+`dotnet run --project test` and the process exit code is the result. `test/Main.fs` is the single
+entry point: it hands the module `testList`s to Quill's `runTestsWith`.
+
+Each test module exposes `let tests = testList ("Name", [ ... ])`.
 
 Test utilities in `test/Utils.fs`:
 
-- `TestObserver<'a>` - Captures OnNext/OnError/OnCompleted notifications
+- `TestObserver<'a>` - Captures OnNext/OnError/OnCompleted notifications. All state lives in an
+  actor, so `Notifications` is only as fresh as the last `Await`/`AwaitIgnore`/`Refresh` call —
+  after a bare `Async.Sleep`, call `Refresh()` before asserting.
 - `fromNotification` - Creates observables from notification sequences
+- `waitUntil` - Polls a predicate (no blocking primitives, so it works on every target)
+- `containAll` - Nib assertion for order-insensitive containment. Nib's own `haveSameElements`
+  sorts, which `Notification<'a>` cannot do: `OnError of exn` leaves the type without a
+  comparison constraint.
 
 Example test pattern:
 
 ```fsharp
-testAsync "Test name" {
-    let xs = Reactive.single 42 |> Reactive.map (fun x -> x * 10)
-    let obv = TestObserver<int>()
-    let! sub = xs.SubscribeAsync obv
-    let! latest = obv.Await()
-    Expect.equal latest 420 "Should be equal"
-}
+open Scriptorium.Quill
+open Scriptorium.Nib.Assertion
+open type Scriptorium.Quill.Test
+
+let tests =
+    testList (
+        "Map",
+        [ testAsync (
+              "map",
+              async {
+                  let xs = Reactive.single 42 |> Reactive.map (fun x -> x * 10)
+                  let obv = TestObserver<int>()
+                  let! _sub = xs.SubscribeAsync obv
+                  let! latest = obv.Await()
+                  assertThat latest (isEqualTo 420)
+              }
+          ) ]
+    )
 ```
+
+Tests within a `testList` run in **parallel**; use `testSequenced` if a group ever needs
+serializing. The runner raises Quill's "slow test" threshold to 1000ms, since this suite sleeps
+on purpose (timers, debounce, subjects).
+
+Scriptorium is Fable-compatible, so this one suite is able to compile and run on every Fable
+target, not just .NET.
 
 ## Architecture
 

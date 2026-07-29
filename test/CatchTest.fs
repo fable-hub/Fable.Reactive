@@ -1,142 +1,154 @@
 module Tests.Catch
 
-open System.Threading.Tasks
+open Scriptorium.Quill
+open Scriptorium.Nib.Assertion
+open type Scriptorium.Quill.Test
 
 open Fable.Reactive
-
-open Expecto
 open Tests.Utils
 
 exception MyError of string
 
-[<Tests>]
 let tests =
-    testList
-        "Query Tests"
-        [
+    testList (
+        "Catch",
+        [ testAsync (
+              "catch no error",
+              async {
+                  // Arrange
+                  let xs = fromNotification [ OnNext 1; OnNext 2; OnNext 3; OnCompleted ]
+                  let ys = fromNotification [ OnNext 4; OnNext 5; OnNext 6; OnCompleted ]
+                  let zs = xs |> Reactive.catch (fun _ -> ys)
+                  let obv = TestObserver<int>()
 
-          testAsync "Test catch no error" {
-              // Arrange
-              let xs = fromNotification [ OnNext 1; OnNext 2; OnNext 3; OnCompleted ]
-              let ys = fromNotification [ OnNext 4; OnNext 5; OnNext 6; OnCompleted ]
-              let zs = xs |> Reactive.catch (fun _ -> ys)
-              let obv = TestObserver<int>()
+                  // Act
+                  let! _sub = zs.SubscribeAsync obv
+                  do! obv.AwaitIgnore()
 
-              // Act
-              let! sub = zs.SubscribeAsync obv
-              do! obv.AwaitIgnore()
+                  // Assert
+                  let actual = obv.Notifications |> Seq.toList
+                  let expected: Notification<int> list = [ OnNext 1; OnNext 2; OnNext 3; OnCompleted ]
+                  assertThat actual (isEqualTo expected)
+              }
+          )
 
-              // Assert
-              let actual = obv.Notifications |> Seq.toList
-              let expected: Notification<int> list = [ OnNext 1; OnNext 2; OnNext 3; OnCompleted ]
-              Expect.equal actual expected "Should be equal"
-          }
+          testAsync (
+              "catch error",
+              async {
+                  // Arrange
+                  let error = MyError "error"
+                  let xs = fromNotification [ OnNext 1; OnNext 2; OnNext 3; OnError error ]
+                  let ys = fromNotification [ OnNext 4; OnNext 5; OnNext 6; OnCompleted ]
+                  let zs = xs |> Reactive.catch (fun _ -> ys)
+                  let obv = TestObserver<int>()
 
+                  // Act
+                  let! _sub = zs.SubscribeAsync obv
+                  do! obv.AwaitIgnore()
 
-          testAsync "Test catch error" {
-              // Arrange
-              let error = MyError "error"
-              let xs = fromNotification [ OnNext 1; OnNext 2; OnNext 3; OnError error ]
-              let ys = fromNotification [ OnNext 4; OnNext 5; OnNext 6; OnCompleted ]
-              let zs = xs |> Reactive.catch (fun _ -> ys)
-              let obv = TestObserver<int>()
+                  // Assert
+                  let actual = obv.Notifications |> Seq.toList
 
-              // Act
-              let! sub = zs.SubscribeAsync obv
-              do! obv.AwaitIgnore()
+                  let expected: Notification<int> list =
+                      [ OnNext 1; OnNext 2; OnNext 3; OnNext 4; OnNext 5; OnNext 6; OnCompleted ]
 
-              // Assert
-              let actual = obv.Notifications |> Seq.toList
+                  assertThat actual (isEqualTo expected)
+              }
+          )
 
-              let expected: Notification<int> list =
-                  [ OnNext 1; OnNext 2; OnNext 3; OnNext 4; OnNext 5; OnNext 6; OnCompleted ]
+          testAsync (
+              "catch error exception is propagated",
+              async {
+                  // Arrange
+                  let error = MyError "ing"
+                  let xs = fromNotification [ OnNext "test"; OnError error ]
 
-              Expect.equal actual expected "Should be equal"
-          }
+                  let zs =
+                      xs
+                      |> Reactive.catch (fun err ->
+                          let msg =
+                              match err with
+                              | MyError msg -> msg
+                              | _ -> "error"
 
-          testAsync "Test catch error exception is propagated" {
-              // Arrange
-              let error = MyError "ing"
-              let xs = fromNotification [ OnNext "test"; OnError error ]
+                          Reactive.single msg)
 
-              let zs =
-                  xs
-                  |> Reactive.catch (fun err ->
-                      let msg =
-                          match err with
-                          | MyError msg -> msg
-                          | _ -> "error"
+                  let obv = TestObserver<string>()
 
-                      Reactive.single msg)
+                  // Act
+                  let! _sub = zs.SubscribeAsync obv
+                  do! obv.AwaitIgnore()
 
-              let obv = TestObserver<string>()
+                  // Assert
+                  let actual = obv.Notifications |> Seq.toList
+                  let expected = [ OnNext "test"; OnNext "ing"; OnCompleted ]
+                  assertThat actual (isEqualTo expected)
+              }
+          )
 
-              // Act
-              let! sub = zs.SubscribeAsync obv
-              do! obv.AwaitIgnore()
+          testAsync (
+              "catch error twice",
+              async {
+                  // Arrange
+                  let error = MyError "error"
+                  let xs = fromNotification [ OnNext 1; OnError error ]
+                  let ys1 = fromNotification [ OnNext 2; OnError error ]
+                  let ys2 = fromNotification [ OnNext 3; OnCompleted ]
 
-              // Assert
-              let actual = obv.Notifications |> Seq.toList
-              let expected = [ OnNext "test"; OnNext "ing"; OnCompleted ]
-              Expect.equal actual expected "Should be equal"
-          }
+                  let iter =
+                      [ ys1; ys2 ]
+                      |> Seq.ofList
+                      |> fun x -> x.GetEnumerator()
 
-          testAsync "Test catch error twice" {
-              // Arrange
-              let error = MyError "error"
-              let xs = fromNotification [ OnNext 1; OnError error ]
-              let ys1 = fromNotification [ OnNext 2; OnError error ]
-              let ys2 = fromNotification [ OnNext 3; OnCompleted ]
+                  let zs =
+                      xs
+                      |> Reactive.catch (fun _ ->
+                          iter.MoveNext() |> ignore
+                          iter.Current)
 
-              let iter =
-                  [ ys1; ys2 ]
-                  |> Seq.ofList
-                  |> fun x -> x.GetEnumerator()
+                  let obv = TestObserver<int>()
 
-              let zs =
-                  xs
-                  |> Reactive.catch (fun _ ->
-                      iter.MoveNext() |> ignore
-                      iter.Current)
+                  // Act
+                  let! _sub = zs.SubscribeAsync obv
+                  do! obv.AwaitIgnore()
 
-              let obv = TestObserver<int>()
+                  // Assert
+                  let actual = obv.Notifications |> Seq.toList
+                  let expected: Notification<int> list = [ OnNext 1; OnNext 2; OnNext 3; OnCompleted ]
+                  assertThat actual (isEqualTo expected)
+              }
+          )
 
-              // Act
-              let! sub = zs.SubscribeAsync obv
-              do! obv.AwaitIgnore()
+          testAsync (
+              "catch dispose after fallback disposes current subscription",
+              async {
+                  // Arrange
+                  let error = MyError "error"
+                  let xs = fromNotification [ OnNext 1; OnError error ]
+                  let dispatch, fallback = Reactive.subject<int> ()
+                  let zs = xs |> Reactive.catch (fun _ -> fallback)
+                  let obv = TestObserver<int>()
 
-              // Assert
-              let actual = obv.Notifications |> Seq.toList
-              let expected: Notification<int> list = [ OnNext 1; OnNext 2; OnNext 3; OnCompleted ]
-              Expect.equal actual expected "Should be equal"
-          }
+                  // Act
+                  let! sub = zs.SubscribeAsync obv
+                  do! Async.Sleep 100 // Let error propagate and switch to fallback
+                  do! dispatch.OnNextAsync 42
+                  do! Async.Sleep 100
 
-          testAsync "Test catch dispose after fallback disposes current subscription" {
-              // Arrange
-              let error = MyError "error"
-              let xs = fromNotification [ OnNext 1; OnError error ]
-              let dispatch, fallback = Reactive.subject<int> ()
-              let zs = xs |> Reactive.catch (fun _ -> fallback)
-              let obv = TestObserver<int>()
+                  // Dispose should dispose the current (fallback) subscription, not the stale original
+                  do! sub.DisposeAsync()
+                  do! dispatch.OnNextAsync 99
+                  do! Async.Sleep 100
 
-              // Act
-              let! sub = zs.SubscribeAsync obv
-              do! Async.Sleep 100 // Let error propagate and switch to fallback
-              do! dispatch.OnNextAsync 42
-              do! Async.Sleep 100
+                  // Assert - should have 1 from source and 42 from fallback, but NOT 99 after dispose
+                  do! obv.Refresh()
+                  let actual = obv.Notifications |> Seq.toList
 
-              // Dispose should dispose the current (fallback) subscription, not the stale original
-              do! sub.DisposeAsync()
-              do! dispatch.OnNextAsync 99
-              do! Async.Sleep 100
-
-              // Assert - should have 1 from source and 42 from fallback, but NOT 99 after dispose
-              let actual = obv.Notifications |> Seq.toList
-              Expect.contains actual (OnNext 1) "Should contain source element"
-              Expect.contains actual (OnNext 42) "Should contain fallback element before dispose"
-
-              for n in actual do
-                  match n with
-                  | OnNext 99 -> failtest "Should not receive values after dispose"
-                  | _ -> ()
-          } ]
+                  assertThat
+                      actual
+                      (contain (OnNext 1) // from the source
+                       >> contain (OnNext 42) // from the fallback, before dispose
+                       >> notContain (OnNext 99)) // after dispose, must not arrive
+              }
+          ) ]
+    )

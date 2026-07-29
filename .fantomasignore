@@ -1,0 +1,6 @@
+# Pre-Expecto leftovers: these still `open NUnit.Framework` / `FsUnit`, are not in Tests.fsproj,
+# and do not compile. Ignored so `just format` stops rewriting dead code on every run.
+# Switch and CallCC coverage exists nowhere else — port them to Scriptorium or delete them.
+test/CallCCTest.fs
+test/DebounceTest.fs
+test/SwitchTest.fs
