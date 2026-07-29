@@ -16,7 +16,7 @@ module internal Subjects =
         let actor =
             Actor.spawn (fun inbox ->
                 let rec waitForSubscriber (buffer: Notification<'TSource> list) =
-                    async {
+                    actor {
                         let! msg = inbox.Receive()
 
                         match msg with
@@ -30,7 +30,7 @@ module internal Subjects =
                     }
 
                 and forwarding (obv: IAsyncObserver<'TSource>) =
-                    async {
+                    actor {
                         let! msg = inbox.Receive()
 
                         match msg with
@@ -40,7 +40,7 @@ module internal Subjects =
                         | Subscribe _ -> failwith "singleSubject: Already subscribed"
                     }
 
-                and deliverNotification (obv: IAsyncObserver<'TSource>) (n: Notification<'TSource>) =
+                and deliverNotification (obv: IAsyncObserver<'TSource>) (n: Notification<'TSource>) : Async<unit> =
                     async {
                         match n with
                         | OnNext x ->
@@ -78,7 +78,7 @@ module internal Subjects =
         let mb =
             Actor.spawn (fun inbox ->
                 let rec messageLoop () =
-                    async {
+                    actor {
                         let! n = inbox.Receive()
 
                         match n with

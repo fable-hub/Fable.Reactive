@@ -48,7 +48,7 @@ module AsyncObserver =
         let agent =
             Actor.spawn (fun inbox ->
                 let rec messageLoop stopped =
-                    async {
+                    actor {
                         let! n = inbox.Receive()
 
                         if stopped then
@@ -94,7 +94,7 @@ module AsyncObserver =
         let agent =
             Actor.spawn (fun inbox ->
                 let rec messageLoop disposables =
-                    async {
+                    actor {
                         let! cmd = inbox.Receive()
 
                         let! disposables' =

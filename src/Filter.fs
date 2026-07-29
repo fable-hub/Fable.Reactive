@@ -52,7 +52,7 @@ module internal Filter =
             let agent =
                 Actor.spawn (fun inbox ->
                     let rec messageLoop (latest: Notification<'TSource>) =
-                        async {
+                        actor {
                             let! n = inbox.Receive()
 
                             let! latest' =

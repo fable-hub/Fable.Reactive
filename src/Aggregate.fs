@@ -100,7 +100,7 @@ module internal Aggregation =
             let agent =
                 Actor.spawn (fun inbox ->
                     let rec messageLoop ((groups, disposed): Map<'TKey, IAsyncObserver<'TSource>> * bool) =
-                        async {
+                        actor {
                             let! n = inbox.Receive()
 
                             if disposed then

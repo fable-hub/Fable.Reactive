@@ -17,7 +17,7 @@ module internal Timeshift =
             let agent =
                 Actor.spawn (fun inbox ->
                     let rec messageLoop () =
-                        async {
+                        actor {
                             let! n, dueTime = inbox.Receive()
 
                             let diff: TimeSpan = dueTime - DateTime.UtcNow
@@ -68,7 +68,7 @@ module internal Timeshift =
             let agent =
                 Actor.spawn (fun inbox ->
                     let rec messageLoop currentIndex =
-                        async {
+                        actor {
                             let! n, index = inbox.Receive()
 
                             let! newIndex =

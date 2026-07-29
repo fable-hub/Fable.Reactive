@@ -84,8 +84,28 @@ Tests within a `testList` run in **parallel**; use `testSequenced` if a group ev
 serializing. The runner raises Quill's "slow test" threshold to 1000ms, since this suite sleeps
 on purpose (timers, debounce, subjects).
 
-Scriptorium is Fable-compatible, so this one suite is able to compile and run on every Fable
-target, not just .NET.
+Scriptorium is Fable-compatible, so this one suite compiles and runs on every Fable target, not
+just .NET. Quill knows how to end the process on each platform.
+
+```bash
+just test          # .NET — the green gate (86/86)
+just test-js       # JS via Node (82/84)
+just test-python   # Python via uv (79/84)
+just test-beam     # Erlang via rebar3 + erl (14/84)
+just test-all      # all four
+```
+
+The Fable targets need the `fable` tool at **5.13.0** (Quill 0.5.1 uses `Fable.Core.Compiler.isX`,
+which older tools reject). The recipes export `FableCompile=true`, which drops the .NET-only
+`extra/AsyncSeq` project and `AsyncSeqTest.fs` from Fable builds — MSBuild reads environment
+variables as global properties, which is the only way to get a property into the design-time build
+Fable runs internally.
+
+The remaining Fable-target failures are pre-existing library gaps, not harness problems. Most trace
+to `Async.Start'` in `src/Core.fs`, which is `Async.StartImmediate` under `FABLE_COMPILER` and
+`Async.Start` on .NET: work that runs inline cannot be cancelled by a later `DisposeAsync`, and
+eager emissions can outrun a subscription. On BEAM, terminal notifications don't reach the observer
+at all, so every `Await`/`AwaitIgnore` blocks until Quill's 5s timeout.
 
 ## Architecture
 
