@@ -45,8 +45,14 @@ Test utilities in `test/Utils.fs`:
 - `TestObserver<'a>` - Captures OnNext/OnError/OnCompleted notifications. All state lives in an
   actor, so `Notifications` is only as fresh as the last `Await`/`AwaitIgnore`/`Refresh` call —
   after a bare `Async.Sleep`, call `Refresh()` before asserting.
+- `TestObserver.WaitUntil` - Polls the store until the notifications satisfy a predicate,
+  refreshing the cache as it goes. **Reach for this before `Async.Sleep`**: a fixed sleep that
+  waits on a timer or an async subscription is a race, and CI runners are slow enough to lose
+  it. Quill's timeout is what fails the test if the value never arrives. A sleep is only right
+  when asserting a negative ("this must *not* arrive"), where there is no condition to wait on —
+  give those a wide margin.
 - `fromNotification` - Creates observables from notification sequences
-- `waitUntil` - Polls a predicate (no blocking primitives, so it works on every target)
+- `waitUntil` - Polls a plain predicate (no blocking primitives, so it works on every target)
 - `containAll` - Nib assertion for order-insensitive containment. Nib's own `haveSameElements`
   sorts, which `Notification<'a>` cannot do: `OnError of exn` leaves the type without a
   comparison constraint.
