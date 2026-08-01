@@ -1,11 +1,24 @@
 ---
-last_commit_released: 92de51cf7ea44ad4e87ad802718c558ee9ec6797
+last_commit_released: 2c3fbd69bae145838ea11fbed96b097fdaa31336
 name: Fable.Reactive
 ---
 
 # Changelog
 
 All notable changes to this project will be documented in this file.
+
+## 1.0.0-rc.7 - 2026-08-01
+
+### 🚀 Features
+
+* *(beam)* Port src to the BEAM target and wire cross-target test runs (#25) ([404772f](https://github.com/fable-hub/Fable.Reactive/commit/404772f4d90aeb1c7d4d542cf7855845d2d0fe81))
+
+### 🐞 Bug Fixes
+
+* Escalate supervisor-monitor failures instead of hanging (#36) ([2c3fbd6](https://github.com/fable-hub/Fable.Reactive/commit/2c3fbd69bae145838ea11fbed96b097fdaa31336))
+* *(beam)* Trap exits in the supervisor monitor (#32) ([95ec618](https://github.com/fable-hub/Fable.Reactive/commit/95ec618b0c28b181aeae2bbac6053120526e1089))
+
+<strong><small>[View changes on Github](https://github.com/fable-hub/Fable.Reactive/compare/92de51cf7ea44ad4e87ad802718c558ee9ec6797..2c3fbd69bae145838ea11fbed96b097fdaa31336)</small></strong>
 
 ## 1.0.0-rc.6 - 2026-04-06
 
