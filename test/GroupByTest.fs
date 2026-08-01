@@ -1,96 +1,118 @@
 module Tests.GroupBy
 
+open Scriptorium.Quill
+open Scriptorium.Nib.Assertion
+open type Scriptorium.Quill.Test
+
 open Fable.Reactive
-open Expecto
 open Tests.Utils
 
 exception MyError of string
 
-[<Tests>]
-let tests = testList "GroupBy Tests" [
+let tests =
+    testList (
+        "GroupBy",
+        [ testAsync (
+              "groupBy empty",
+              async {
+                  // Arrange
+                  let xs =
+                      Reactive.empty<int> ()
+                      |> Reactive.groupBy (fun _ -> 42)
+                      |> Reactive.flatMap id
 
-    testAsync "Test groupby empty" {
-        // Arrange
-        let xs = Reactive.empty<int> ()
-                |> Reactive.groupBy (fun _ -> 42)
-                |> Reactive.flatMap id
-        let obv = TestObserver<int>()
+                  let obv = TestObserver<int>()
 
-        // Act
-        let! sub = xs.SubscribeAsync obv
+                  // Act
+                  let! _sub = xs.SubscribeAsync obv
 
-        try
-            do! obv.AwaitIgnore ()
-        with
-        | _ -> ()
+                  try
+                      do! obv.AwaitIgnore()
+                  with _ ->
+                      ()
 
-        // Assert
-        Expect.equal obv.Notifications.Count 1 "Should be equal"
-        let actual = obv.Notifications |> Seq.toList
-        let expected : Notification<int> list = [ OnCompleted ]
-        Expect.equal actual expected "Should be equal"
-    }
+                  // Assert
+                  let actual = obv.Notifications |> Seq.toList
+                  let expected: Notification<int> list = [ OnCompleted ]
+                  assertThat actual (isEqualTo expected)
+              }
+          )
 
-    testAsync "Test groupby error" {
-        // Arrange
-        let error = MyError "error"
-        let xs = Reactive.fail<int> error
-                |> Reactive.groupBy (fun _ -> 42)
-                |> Reactive.flatMap id
-        let obv = TestObserver<int>()
+          testAsync (
+              "groupBy error",
+              async {
+                  // Arrange
+                  let error = MyError "error"
 
-        // Act
-        let! sub = xs.SubscribeAsync obv
+                  let xs =
+                      Reactive.fail<int> error
+                      |> Reactive.groupBy (fun _ -> 42)
+                      |> Reactive.flatMap id
 
-        try
-            do! obv.AwaitIgnore ()
-        with
-        | _ -> ()
+                  let obv = TestObserver<int>()
 
-        // Assert
-        Expect.equal obv.Notifications.Count 1 "Should be equal"
-        let actual = obv.Notifications |> Seq.toList
-        let expected : Notification<int> list = [ OnError error ]
-        Expect.equal actual expected "Should be equal"
-    }
+                  // Act
+                  let! _sub = xs.SubscribeAsync obv
 
-    testAsync "Test groupby 2 groups" {
-        // Arrange
-        let xs = Reactive.ofSeq [1; 2; 3; 4; 5; 6]
-                |> Reactive.groupBy (fun x -> x % 2)
-                |> Reactive.flatMap (fun x -> x |> Reactive.min)
-        let obv = TestObserver<int> ()
+                  try
+                      do! obv.AwaitIgnore()
+                  with _ ->
+                      ()
 
-        // Act
-        let! sub = xs.SubscribeAsync obv
+                  // Assert
+                  let actual = obv.Notifications |> Seq.toList
+                  let expected: Notification<int> list = [ OnError error ]
+                  assertThat actual (isEqualTo expected)
+              }
+          )
 
-        try
-            do! obv.AwaitIgnore ()
-        with
-        | _ -> ()
+          testAsync (
+              "groupBy 2 groups",
+              async {
+                  // Arrange
+                  let xs =
+                      Reactive.ofSeq [ 1; 2; 3; 4; 5; 6 ]
+                      |> Reactive.groupBy (fun x -> x % 2)
+                      |> Reactive.flatMap (fun x -> x |> Reactive.min)
 
-        // Assert
-        Expect.equal obv.Notifications.Count 3 "Should be equal"
-        let actual = obv.Notifications |> Seq.toList
-        let expected = [
-            [ OnNext 1; OnNext 2; OnCompleted ]
-            [ OnNext 2; OnNext 1; OnCompleted ]
-        ]
-        Expect.contains expected actual  "Should be equal"
-    }
+                  let obv = TestObserver<int>()
 
-    testAsync "Test groupby cancel" {
-        // Arrange
-        let xs = Reactive.ofSeq [1; 2; 3; 4; 5; 6]
-                |> Reactive.groupBy (fun x -> x % 2)
-                |> Reactive.flatMap id
-        let obv = TestObserver<int> ()
+                  // Act
+                  let! _sub = xs.SubscribeAsync obv
 
-        // Act
-        let! sub = xs.SubscribeAsync obv
-        do! sub.DisposeAsync ()
+                  try
+                      do! obv.AwaitIgnore()
+                  with _ ->
+                      ()
 
-        // Assert
-        Expect.isLessThan obv.Notifications.Count 8 "Should be less"
-    }
-]
+                  // Assert - the two groups can complete in either order
+                  let actual = obv.Notifications |> Seq.toList
+
+                  let accepted =
+                      [ [ OnNext 1; OnNext 2; OnCompleted ]; [ OnNext 2; OnNext 1; OnCompleted ] ]
+
+                  assertThat actual (hasSize 3)
+                  assertThat accepted (contain actual)
+              }
+          )
+
+          testAsync (
+              "groupBy cancel",
+              async {
+                  // Arrange
+                  let xs =
+                      Reactive.ofSeq [ 1; 2; 3; 4; 5; 6 ]
+                      |> Reactive.groupBy (fun x -> x % 2)
+                      |> Reactive.flatMap id
+
+                  let obv = TestObserver<int>()
+
+                  // Act
+                  let! sub = xs.SubscribeAsync obv
+                  do! sub.DisposeAsync()
+
+                  // Assert
+                  assertThat obv.Notifications.Count (isLessThan 8)
+              }
+          ) ]
+    )

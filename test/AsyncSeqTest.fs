@@ -1,54 +1,59 @@
 module Tests.AsyncSeq
 
 open System.Collections.Generic
-open System.Threading.Tasks
+
+open Scriptorium.Quill
+open Scriptorium.Nib.Assertion
+open type Scriptorium.Quill.Test
 
 open FSharp.Control
 open Fable.Reactive
-open Expecto
 
-open Tests.Utils
+let tests =
+    testList (
+        "AsyncSeq",
+        [ testAsync (
+              "observable to async seq",
+              async {
+                  // Arrange
+                  let xs =
+                      seq { 1..5 }
+                      |> Reactive.ofSeq
+                      |> Reactive.toAsyncSeq
 
+                  let result = List<int>()
 
+                  let each x = async { result.Add x }
 
-let toTask computation : Task = Async.StartAsTask computation :> _
+                  // Act
+                  do! xs |> AsyncSeq.iterAsync each
 
-[<Tests>]
-let tests = testList "Async Seq Tests" [
+                  // Assert
+                  let actual = result |> List.ofSeq
+                  assertThat actual (isEqualTo [ 1..5 ])
+              }
+          )
 
-    testAsync "Test to async seq" {
-        let xs = seq { 1..5 } |> Reactive.ofSeq  |> Reactive.toAsyncSeq
-        let result = List<int> ()
+          testAsync (
+              "seq to async seq to observable to async seq",
+              async {
+                  // Arrange
+                  let xs =
+                      seq { 1..5 }
+                      |> AsyncSeq.ofSeq
+                      |> Reactive.ofAsyncSeq
+                      |> Reactive.toAsyncSeq
 
-        let each x = async {
-            result.Add x
-        }
+                  let result = List<int>()
 
-        // Act
-        do! xs |> AsyncSeq.iterAsync each
+                  let each x = async { result.Add x }
 
-        // Assert
-        Expect.equal result.Count 5 "Should match"
-        let expected = seq { 1..5 } |> Seq.toList
-        let result = result |> List.ofSeq
-        Expect.equal result expected "Should be equal"
-    }
+                  // Act
+                  do! xs |> AsyncSeq.iterAsync each
 
-    testAsync "Test seq to async seq to async observerable to async seq" {
-        let xs = seq { 1..5 } |> AsyncSeq.ofSeq |> Reactive.ofAsyncSeq |> Reactive.toAsyncSeq
-        let result = List<int> ()
-
-        let each x = async {
-            result.Add x
-        }
-
-        // Act
-        do! xs |> AsyncSeq.iterAsync each
-
-        // Assert
-        Expect.equal result.Count 5 "Should match"
-        let expected = seq { 1..5 } |> Seq.toList
-        let result = result |> List.ofSeq
-        Expect.equal result expected "Should be equal"
-    }
-]
+                  // Assert
+                  let actual = result |> List.ofSeq
+                  assertThat actual (isEqualTo [ 1..5 ])
+              }
+          ) ]
+    )

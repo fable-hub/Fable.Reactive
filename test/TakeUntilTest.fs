@@ -1,43 +1,50 @@
 module Tests.TakeUntil
 
+open Scriptorium.Quill
+open Scriptorium.Nib.Assertion
+open type Scriptorium.Quill.Test
+
 open Fable.Reactive
 open Fable.Reactive.Subjects
 open Tests.Utils
 
-open Expecto
-
 exception MyError of string
 
-[<Tests>]
-let tests = testList "TakeUntil Tests" [
+let tests =
+    testList (
+        "TakeUntil",
+        [ testAsync (
+              "takeUntil stops at the first notifier value",
+              async {
+                  // Arrange
+                  let obvX, xs = subject<int> ()
+                  let obvY, ys = subject<bool> ()
+                  let zs = xs |> Reactive.takeUntil ys
 
-    testAsync "Test takeUntil async" {
-        // Arrange
-        let obvX, xs = subject<int> ()
-        let obvY, ys = subject<bool> ()
-        let zs = xs |> Reactive.takeUntil ys
+                  let obv = TestObserver<int>()
 
-        let obv = TestObserver<int>()
+                  // Act
+                  let! _sub = zs.SubscribeAsync obv
+                  do! Async.Sleep 100
+                  do! obvX.OnNextAsync 1
+                  do! obvX.OnNextAsync 2
+                  do! obvY.OnNextAsync true
+                  do! Async.Sleep 500
+                  do! obvX.OnNextAsync 3
+                  do! obvX.OnCompletedAsync()
 
-        // Act
-        let! sub = zs.SubscribeAsync obv
-        do! Async.Sleep 100
-        do! obvX.OnNextAsync 1
-        do! obvX.OnNextAsync 2
-        do! obvY.OnNextAsync true
-        do! Async.Sleep 500
-        do! obvX.OnNextAsync 3
-        do! obvX.OnCompletedAsync ()
+                  try
+                      do! obv.AwaitIgnore()
+                  with _ ->
+                      ()
 
-        try
-            do! obv.AwaitIgnore ()
-        with
-        | _ -> ()
+                  // Assert
+                  let actual = obv.Notifications |> Seq.toList
 
-        // Assert
-        Expect.equal obv.Notifications.Count 3 "Wrong count"
-        let actual = obv.Notifications |> Seq.toList
-        let expected = [ OnNext 1; OnNext 2; OnCompleted ]
-        Expect.containsAll actual expected "Should contain all"
-    }
-   ]
+                  assertThat
+                      actual
+                      (hasSize 3
+                       >> containAll [ OnNext 1; OnNext 2; OnCompleted ])
+              }
+          ) ]
+    )

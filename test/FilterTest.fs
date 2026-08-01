@@ -1,82 +1,98 @@
 module Tests.Filter
 
-open Fable.Reactive
+open Scriptorium.Quill
+open Scriptorium.Nib.Assertion
+open type Scriptorium.Quill.Test
 
-open Expecto
+open Fable.Reactive
 open Tests.Utils
 
 exception MyError of string
 
-[<Tests>]
-let tests = testList "Filter Tests" [
+let tests =
+    testList (
+        "Filter",
+        [ testAsync (
+              "filterAsync",
+              async {
+                  // Arrange
+                  let predicate x = async { return x < 3 }
 
-    testAsync "Test filter async" {
-        // Arrange
-        let predicate x =
-            async {
-                return x < 3
-            }
+                  let xs =
+                      seq { 1..5 }
+                      |> Reactive.ofSeq
+                      |> Reactive.filterAsync predicate
 
-        let xs = seq { 1..5 } |> Reactive.ofSeq |> Reactive.filterAsync predicate
-        let obv = TestObserver<int>()
+                  let obv = TestObserver<int>()
 
-        // Act
-        let! sub = xs.SubscribeAsync obv
-        let! result = obv.Await ()
+                  // Act
+                  let! _sub = xs.SubscribeAsync obv
+                  let! result = obv.Await()
 
-        // Assert
-        Expect.equal result 2 "should be equal"
-        Expect.equal obv.Notifications.Count 3 "Wrong count"
-        let actual = obv.Notifications |> Seq.toList
-        let expected = [ OnNext 1; OnNext 2; OnCompleted ]
-        Expect.equal actual expected "Should be equal"
-    }
+                  // Assert
+                  assertThat result (isEqualTo 2)
+                  let actual = obv.Notifications |> Seq.toList
+                  let expected = [ OnNext 1; OnNext 2; OnCompleted ]
+                  assertThat actual (isEqualTo expected)
+              }
+          )
 
+          testAsync (
+              "filter",
+              async {
+                  // Arrange
+                  let predicate x = x < 3
 
-    testAsync "Test filter" {
-        // Arrange
-        let predicate x = x < 3
+                  let xs =
+                      seq { 1..5 }
+                      |> Reactive.ofSeq
+                      |> Reactive.filter predicate
 
-        let xs = seq { 1..5 } |> Reactive.ofSeq |> Reactive.filter predicate
-        let obv = TestObserver<int>()
+                  let obv = TestObserver<int>()
 
-        // Act
-        let! sub = xs.SubscribeAsync obv
-        let! result = obv.Await ()
+                  // Act
+                  let! _sub = xs.SubscribeAsync obv
+                  let! result = obv.Await()
 
-        // Assert
-        Expect.equal result 2 "Should be equal"
-        Expect.equal obv.Notifications.Count 3 "Wrong count"
-        let actual = obv.Notifications |> Seq.toList
-        let expected = [ OnNext 1; OnNext 2; OnCompleted ]
-        Expect.equal actual expected "Should be equal"
-    }
+                  // Assert
+                  assertThat result (isEqualTo 2)
+                  let actual = obv.Notifications |> Seq.toList
+                  let expected = [ OnNext 1; OnNext 2; OnCompleted ]
+                  assertThat actual (isEqualTo expected)
+              }
+          )
 
-    testAsync "Test filter predicate throws exception" {
-        // Arrange
-        let error = MyError "error"
-        let predicate x =
-            async {
-                raise error
-                return true
-            }
+          testAsync (
+              "filter predicate throws exception",
+              async {
+                  // Arrange
+                  let error = MyError "error"
 
-        let xs = seq { 1..5 } |> Reactive.ofSeq |> Reactive.filterAsync predicate
-        let obv = TestObserver<int>()
+                  let predicate _ =
+                      async {
+                          raise error
+                          return true
+                      }
 
-        // Act
-        let! sub = xs.SubscribeAsync obv
+                  let xs =
+                      seq { 1..5 }
+                      |> Reactive.ofSeq
+                      |> Reactive.filterAsync predicate
 
-        try
-            do! obv.AwaitIgnore ()
-        with
-        | _ -> ()
+                  let obv = TestObserver<int>()
 
-        // Assert
-        Expect.equal obv.Notifications.Count 1 "Wrong count"
-        let actual = obv.Notifications |> Seq.toList
-        let expected : Notification<int> list = [ OnError error ]
-        Expect.equal actual expected "Should be equal"
-    }
+                  // Act
+                  let! _sub = xs.SubscribeAsync obv
 
-]
+                  try
+                      do! obv.AwaitIgnore()
+                  with _ ->
+                      ()
+
+                  // Assert
+                  let actual = obv.Notifications |> Seq.toList
+                  let expected: Notification<int> list = [ OnError error ]
+                  assertThat actual (isEqualTo expected)
+              }
+          ) ]
+    )

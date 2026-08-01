@@ -1,74 +1,93 @@
 module Tests.Scan
 
-open Fable.Reactive
+open Scriptorium.Quill
+open Scriptorium.Nib.Assertion
+open type Scriptorium.Quill.Test
 
-open Expecto
+open Fable.Reactive
 open Tests.Utils
 
 exception MyError of string
 
-[<Tests>]
-let tests = testList "Query Tests" [
+let tests =
+    testList (
+        "Scan",
+        [ testAsync (
+              "scanInitAsync",
+              async {
+                  // Arrange
+                  let scanner acc x = async { return acc + x }
 
-    testAsync "Test scanAsync" {
-        // Arrange
-        let scanner acc x =
-            async {
-                return acc + x
-            }
+                  let xs =
+                      Reactive.ofSeq <| seq { 1..5 }
+                      |> Reactive.scanInitAsync 0 scanner
 
-        let xs = Reactive.ofSeq <| seq { 1..5 } |> Reactive.scanInitAsync 0 scanner
-        let obv = TestObserver<int>()
+                  let obv = TestObserver<int>()
 
-        // Act
-        let! sub = xs.SubscribeAsync obv
-        let! result = obv.Await ()
+                  // Act
+                  let! _sub = xs.SubscribeAsync obv
+                  let! result = obv.Await()
 
-        // Assert
-        Expect.equal result 15 "Should be equal"
-        let actual = obv.Notifications |> Seq.toList
-        let expected = [ OnNext 1; OnNext 3; OnNext 6; OnNext 10; OnNext 15; OnCompleted ]
-        Expect.equal actual expected "Should be equal"
-    }
+                  // Assert
+                  assertThat result (isEqualTo 15)
+                  let actual = obv.Notifications |> Seq.toList
+                  let expected = [ OnNext 1; OnNext 3; OnNext 6; OnNext 10; OnNext 15; OnCompleted ]
+                  assertThat actual (isEqualTo expected)
+              }
+          )
 
-    testAsync "Test scan" {
-        // Arrange
-        let scanner acc x =
-            acc + x
+          testAsync (
+              "scanInit",
+              async {
+                  // Arrange
+                  let scanner acc x = acc + x
 
-        let xs = Reactive.ofSeq <| seq { 1..5 } |> Reactive.scanInit 0 scanner
-        let obv = TestObserver<int>()
+                  let xs =
+                      Reactive.ofSeq <| seq { 1..5 }
+                      |> Reactive.scanInit 0 scanner
 
-        // Act
-        let! sub = xs.SubscribeAsync obv
-        let! result = obv.Await ()
+                  let obv = TestObserver<int>()
 
-        // Assert
-        Expect.equal result 15 "Should be equal"
-        let actual = obv.Notifications |> Seq.toList
-        let expected = [ OnNext 1; OnNext 3; OnNext 6; OnNext 10; OnNext 15; OnCompleted ]
-        Expect.equal actual expected "Should be equal"
-    }
+                  // Act
+                  let! _sub = xs.SubscribeAsync obv
+                  let! result = obv.Await()
 
-    testAsync "Test scan accumulator fails" {
-        // Arrange
-        let error = MyError "error"
-        let scanner acc x =
-            raise error
-            0
+                  // Assert
+                  assertThat result (isEqualTo 15)
+                  let actual = obv.Notifications |> Seq.toList
+                  let expected = [ OnNext 1; OnNext 3; OnNext 6; OnNext 10; OnNext 15; OnCompleted ]
+                  assertThat actual (isEqualTo expected)
+              }
+          )
 
-        let xs = Reactive.ofSeq <| seq { 1..5 } |> Reactive.scanInit 0 scanner
-        let obv = TestObserver<int>()
+          testAsync (
+              "scan accumulator fails",
+              async {
+                  // Arrange
+                  let error = MyError "error"
 
-        // Act
-        let! sub = xs.SubscribeAsync obv
+                  let scanner _ _ =
+                      raise error
+                      0
 
-        try
-            do! obv.AwaitIgnore ()
-        with
-        | ex -> ()
+                  let xs =
+                      Reactive.ofSeq <| seq { 1..5 }
+                      |> Reactive.scanInit 0 scanner
 
-        // Assert
-        Expect.equal obv.Notifications.Count 1 "Should be equal"
-    }
-]
+                  let obv = TestObserver<int>()
+
+                  // Act
+                  let! _sub = xs.SubscribeAsync obv
+
+                  try
+                      do! obv.AwaitIgnore()
+                  with _ ->
+                      ()
+
+                  // Assert
+                  let actual = obv.Notifications |> Seq.toList
+                  let expected: Notification<int> list = [ OnError error ]
+                  assertThat actual (isEqualTo expected)
+              }
+          ) ]
+    )

@@ -2,21 +2,22 @@ group Reactive
     source https://api.nuget.org/v3/index.json
     framework: netstandard2.0
 
-    nuget FSharp.Core
-    nuget Fable.Actor 5.0.0-rc.8
+    nuget FSharp.Core >= 5.0.0 lowest_matching: true
+    nuget Fable.Core >= 5.0.0 lowest_matching: true
+    nuget Fable.Actor 5.0.0-rc.11
 
 group AsyncSeq
     source https://api.nuget.org/v3/index.json
     framework: netstandard2.1
 
-    nuget FSharp.Core
+    nuget FSharp.Core >= 5.0.0 lowest_matching: true
     nuget FSharp.Control.AsyncSeq
 
 group Test
     source https://api.nuget.org/v3/index.json
     framework: net10.0
 
-    nuget coverlet.msbuild
-    nuget Microsoft.NET.Test.Sdk
-    nuget YoloDev.Expecto.TestSdk
-    nuget Expecto
+    nuget FSharp.Core >= 10.1.301 lowest_matching: true
+    nuget Fable.Actor 5.0.0-rc.11
+    nuget Scriptorium.Quill
+    nuget Scriptorium.Nib

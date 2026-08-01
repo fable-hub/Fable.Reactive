@@ -1,153 +1,178 @@
 module Tests.Concat
 
-open System.Threading.Tasks
+open Scriptorium.Quill
+open Scriptorium.Nib.Assertion
+open type Scriptorium.Quill.Test
 
 open Fable.Reactive
-
-open Expecto
 open Tests.Utils
 
 exception MyError of string
 
-[<Tests>]
-let tests = testList "Merge Tests" [
+let tests =
+    testList (
+        "Concat",
+        [ testAsync (
+              "concat empty with empty",
+              async {
+                  // Arrange
+                  let xs = Reactive.empty ()
+                  let ys = Reactive.empty ()
+                  let zs = Reactive.concatSeq [ xs; ys ]
+                  let obv = TestObserver<int>()
 
-    testAsync "Test concat emtpy empty" {
-        // Arrange
-        let xs = Reactive.empty ()
-        let ys = Reactive.empty ()
-        let zs = Reactive.concatSeq [ xs; ys ]
-        let obv = TestObserver<int>()
+                  // Act
+                  let! _sub = zs.SubscribeAsync obv
 
-        // Act
-        let! sub = zs.SubscribeAsync obv
-        try
-            do! obv.AwaitIgnore ()
-        with
-        | _ -> ()
+                  try
+                      do! obv.AwaitIgnore()
+                  with _ ->
+                      ()
 
-        // Assert
-        Expect.equal obv.Notifications.Count 1 "Wrong count"
-        let actual = obv.Notifications |> Seq.toList
-        let expected : Notification<int> list = [ OnCompleted ]
-        Expect.equal actual expected "Should be equal"
-    }
+                  // Assert
+                  let actual = obv.Notifications |> Seq.toList
+                  let expected: Notification<int> list = [ OnCompleted ]
+                  assertThat actual (isEqualTo expected)
+              }
+          )
 
-    testAsync "Test concat non emtpy empty" {
-        // Arrange
-        let xs = seq { 1..3 } |> Reactive.ofSeq
-        let ys = Reactive.empty ()
-        let zs = Reactive.concatSeq [ xs; ys ]
-        let obv = TestObserver<int>()
+          testAsync (
+              "concat non empty with empty",
+              async {
+                  // Arrange
+                  let xs = seq { 1..3 } |> Reactive.ofSeq
+                  let ys = Reactive.empty ()
+                  let zs = Reactive.concatSeq [ xs; ys ]
+                  let obv = TestObserver<int>()
 
-        // Act
-        let! sub = zs.SubscribeAsync obv
-        let! result = obv.Await ()
+                  // Act
+                  let! _sub = zs.SubscribeAsync obv
+                  let! result = obv.Await()
 
-        // Assert
-        Expect.equal result 3 "Should be equal"
-        Expect.equal obv.Notifications.Count 4 "Wrong count"
-        let actual = obv.Notifications |> Seq.toList
-        let expected = [ OnNext 1; OnNext 2; OnNext 3; OnCompleted ]
-        Expect.equal actual expected "Should be equal"
-    }
+                  // Assert
+                  assertThat result (isEqualTo 3)
+                  let actual = obv.Notifications |> Seq.toList
+                  let expected = [ OnNext 1; OnNext 2; OnNext 3; OnCompleted ]
+                  assertThat actual (isEqualTo expected)
+              }
+          )
 
-    testAsync "Test concat empty non empty" {
-        // Arrange
-        let xs = Reactive.empty ()
-        let ys = seq { 1..3 } |> Reactive.ofSeq
-        let zs = Reactive.concatSeq [ xs; ys ]
-        let obv = TestObserver<int>()
+          testAsync (
+              "concat empty with non empty",
+              async {
+                  // Arrange
+                  let xs = Reactive.empty ()
+                  let ys = seq { 1..3 } |> Reactive.ofSeq
+                  let zs = Reactive.concatSeq [ xs; ys ]
+                  let obv = TestObserver<int>()
 
-        // Act
-        let! sub = zs.SubscribeAsync obv
-        let! result = obv.Await ()
+                  // Act
+                  let! _sub = zs.SubscribeAsync obv
+                  let! result = obv.Await()
 
-        // Assert
-        Expect.equal result 3 "Should be equal"
-        Expect.equal obv.Notifications.Count 4 "Wrong count"
-        let actual = obv.Notifications |> Seq.toList
-        let expected = [ OnNext 1; OnNext 2; OnNext 3; OnCompleted ]
-        Expect.equal actual expected "Should be equal"
-    }
+                  // Assert
+                  assertThat result (isEqualTo 3)
+                  let actual = obv.Notifications |> Seq.toList
+                  let expected = [ OnNext 1; OnNext 2; OnNext 3; OnCompleted ]
+                  assertThat actual (isEqualTo expected)
+              }
+          )
 
-    testAsync "Test concat two" {
-        // Arrange
-        let xs = seq { 1..3 } |> Reactive.ofSeq
-        let ys = seq { 4..6 } |> Reactive.ofSeq
-        let zs = Reactive.concatSeq [ xs; ys ]
-        let obv = TestObserver<int> ()
+          testAsync (
+              "concat two",
+              async {
+                  // Arrange
+                  let xs = seq { 1..3 } |> Reactive.ofSeq
+                  let ys = seq { 4..6 } |> Reactive.ofSeq
+                  let zs = Reactive.concatSeq [ xs; ys ]
+                  let obv = TestObserver<int>()
 
-        // Act
-        let! sub = zs.SubscribeAsync obv
-        let! result = obv.Await ()
+                  // Act
+                  let! _sub = zs.SubscribeAsync obv
+                  let! result = obv.Await()
 
-        // Assert
-        Expect.equal result 6 "Should be equal"
-        Expect.equal obv.Notifications.Count 7 "Wrong count"
-        let actual = obv.Notifications |> Seq.toList
-        let expected = [ OnNext 1; OnNext 2; OnNext 3; OnNext 4; OnNext 5; OnNext 6; OnCompleted ]
-        Expect.equal actual expected "Should be equal"
-    }
+                  // Assert
+                  assertThat result (isEqualTo 6)
+                  let actual = obv.Notifications |> Seq.toList
 
-    testAsync "Test concat ++" {
-        // Arrange
-        let xs = seq { 1..3 } |> Reactive.ofSeq
-        let ys = seq { 4..6 } |> Reactive.ofSeq
-        let zs = xs ++ ys
-        let obv = TestObserver<int>()
+                  let expected =
+                      [ OnNext 1; OnNext 2; OnNext 3; OnNext 4; OnNext 5; OnNext 6; OnCompleted ]
 
-        // Act
-        let! sub = zs.SubscribeAsync obv
-        let! result = obv.Await ()
+                  assertThat actual (isEqualTo expected)
+              }
+          )
 
-        // Assert
-        Expect.equal result 6 "Should be equal"
-        Expect.equal obv.Notifications.Count 7 "Wrong count"
-        let actual = obv.Notifications |> Seq.toList
-        let expected = [ OnNext 1; OnNext 2; OnNext 3; OnNext 4; OnNext 5; OnNext 6; OnCompleted ]
-        Expect.equal actual expected "Should be equal"
-    }
+          testAsync (
+              "concat with ++ operator",
+              async {
+                  // Arrange
+                  let xs = seq { 1..3 } |> Reactive.ofSeq
+                  let ys = seq { 4..6 } |> Reactive.ofSeq
+                  let zs = xs ++ ys
+                  let obv = TestObserver<int>()
 
-    testAsync "Test concat three" {
-        // Arrange
-        let a = seq { 1..2 } |> Reactive.ofSeq
-        let b = seq { 3..4 } |> Reactive.ofSeq
-        let c = seq { 5..6 } |> Reactive.ofSeq
-        let xs = Reactive.concatSeq [ a; b; c ]
-        let obv = TestObserver<int>()
+                  // Act
+                  let! _sub = zs.SubscribeAsync obv
+                  let! result = obv.Await()
 
-        // Act
-        let! sub = xs.SubscribeAsync obv
-        let! result = obv.Await ()
+                  // Assert
+                  assertThat result (isEqualTo 6)
+                  let actual = obv.Notifications |> Seq.toList
 
-        // Assert
-        Expect.equal result 6 "Should be equal"
-        Expect.equal obv.Notifications.Count 7 "Wrong count"
-        let actual = obv.Notifications |> Seq.toList
-        let expected = [ OnNext 1; OnNext 2; OnNext 3; OnNext 4; OnNext 5; OnNext 6; OnCompleted ]
-        Expect.equal actual expected "Should be equal"
-    }
+                  let expected =
+                      [ OnNext 1; OnNext 2; OnNext 3; OnNext 4; OnNext 5; OnNext 6; OnCompleted ]
 
-    testAsync "Test concat fail with non emtpy" {
-        // Arrange
-        let error = MyError "error"
-        let xs = Reactive.fail error
-        let ys = seq { 1..3 } |> Reactive.ofSeq
-        let zs = Reactive.concatSeq [ xs; ys ]
-        let obv = TestObserver<int>()
+                  assertThat actual (isEqualTo expected)
+              }
+          )
 
-        // Act
-        let! sub = zs.SubscribeAsync obv
-        try
-            do! obv.AwaitIgnore ()
-        with
-        | _ -> ()
+          testAsync (
+              "concat three",
+              async {
+                  // Arrange
+                  let a = seq { 1..2 } |> Reactive.ofSeq
+                  let b = seq { 3..4 } |> Reactive.ofSeq
+                  let c = seq { 5..6 } |> Reactive.ofSeq
+                  let xs = Reactive.concatSeq [ a; b; c ]
+                  let obv = TestObserver<int>()
 
-        // Assert
-        Expect.equal obv.Notifications.Count 1 "Wrong count"
-        let actual = obv.Notifications |> Seq.toList
-        let expected : Notification<int> list = [ OnError error ]
-        Expect.equal actual expected "Should be equal"
-    }
-]
+                  // Act
+                  let! _sub = xs.SubscribeAsync obv
+                  let! result = obv.Await()
+
+                  // Assert
+                  assertThat result (isEqualTo 6)
+                  let actual = obv.Notifications |> Seq.toList
+
+                  let expected =
+                      [ OnNext 1; OnNext 2; OnNext 3; OnNext 4; OnNext 5; OnNext 6; OnCompleted ]
+
+                  assertThat actual (isEqualTo expected)
+              }
+          )
+
+          testAsync (
+              "concat fail with non empty",
+              async {
+                  // Arrange
+                  let error = MyError "error"
+                  let xs = Reactive.fail error
+                  let ys = seq { 1..3 } |> Reactive.ofSeq
+                  let zs = Reactive.concatSeq [ xs; ys ]
+                  let obv = TestObserver<int>()
+
+                  // Act
+                  let! _sub = zs.SubscribeAsync obv
+
+                  try
+                      do! obv.AwaitIgnore()
+                  with _ ->
+                      ()
+
+                  // Assert
+                  let actual = obv.Notifications |> Seq.toList
+                  let expected: Notification<int> list = [ OnError error ]
+                  assertThat actual (isEqualTo expected)
+              }
+          ) ]
+    )

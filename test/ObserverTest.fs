@@ -1,180 +1,211 @@
 module Tests.Observer
 
+open Scriptorium.Quill
+open Scriptorium.Nib.Assertion
+open type Scriptorium.Quill.Test
+
 open Fable.Reactive
 open Fable.Reactive.Core
-
-open Expecto
 open Tests.Utils
-open Fable.Reactive
-open System.Threading
 
 exception MyError of string
 
-[<Tests>]
-let tests = testList "Observer Tests" [
+let tests =
+    testList (
+        "Observer",
+        [ testAsync (
+              "safe observer empty sequence",
+              async {
+                  // Arrange
+                  let xs = fromNotification Seq.empty
+                  let obv = TestObserver<int>()
+                  let safeObv = safeObserver obv AsyncDisposable.Empty
 
-    testAsync "Test safe observer empty sequence" {
-        // Arrange
-        let xs = fromNotification Seq.empty
-        let obv = TestObserver<int> ()
-        let safeObv = safeObserver obv AsyncDisposable.Empty
+                  // Act
+                  let! _dispose = xs.SubscribeAsync safeObv
 
-        // Act
-        let! dispose = xs.SubscribeAsync safeObv
+                  // Assert
+                  let actual = obv.Notifications |> Seq.toList
+                  let expected: Notification<int> list = []
 
-        // Assert
-        let actual = obv.Notifications |> Seq.toList
-        let expected : Notification<int> list = [ ]
+                  assertThat actual (isEqualTo expected)
+              }
+          )
 
-        Expect.equal actual expected "Should be equal"
-    }
+          testAsync (
+              "safe observer error sequence",
+              async {
+                  // Arrange
+                  let error = MyError "error"
+                  let xs = fromNotification [ OnError error ]
+                  let obv = TestObserver<int>()
+                  let safeObv = safeObserver obv AsyncDisposable.Empty
 
-    testAsync "Test safe observer error sequence" {
-        // Arrange
-        let error = MyError "error"
-        let xs = fromNotification [ OnError error ]
-        let obv = TestObserver<int>()
-        let safeObv = safeObserver obv AsyncDisposable.Empty
+                  // Act
+                  let! _dispose = xs.SubscribeAsync safeObv
 
-        // Act
-        let! dispose = xs.SubscribeAsync safeObv
-        try
-            do! obv.AwaitIgnore ()
-        with
-        | _ -> ()
+                  try
+                      do! obv.AwaitIgnore()
+                  with _ ->
+                      ()
 
-        // Assert
-        let actual = obv.Notifications |> Seq.toList
-        let expected : Notification<int> list = [ OnError error ]
+                  // Assert
+                  let actual = obv.Notifications |> Seq.toList
+                  let expected: Notification<int> list = [ OnError error ]
 
-        Expect.equal actual expected "Should be equal"
-    }
+                  assertThat actual (isEqualTo expected)
+              }
+          )
 
-    testAsync "Test safe observer happy" {
-        // Arrange
-        let xs = Reactive.ofSeq [ 1..3]
-        let obv = TestObserver<int>()
-        let safeObv = safeObserver obv AsyncDisposable.Empty
+          testAsync (
+              "safe observer happy",
+              async {
+                  // Arrange
+                  let xs = Reactive.ofSeq [ 1..3 ]
+                  let obv = TestObserver<int>()
+                  let safeObv = safeObserver obv AsyncDisposable.Empty
 
-        // Act
-        let! dispose = xs.SubscribeAsync safeObv
-        do! obv.AwaitIgnore ()
+                  // Act
+                  let! _dispose = xs.SubscribeAsync safeObv
+                  do! obv.AwaitIgnore()
 
-        // Assert
-        let actual = obv.Notifications |> Seq.toList
-        let expected = [ OnNext 1; OnNext 2; OnNext 3; OnCompleted ]
+                  // Assert
+                  let actual = obv.Notifications |> Seq.toList
+                  let expected = [ OnNext 1; OnNext 2; OnNext 3; OnCompleted ]
 
-        Expect.equal actual expected "Should be equal"
-    }
+                  assertThat actual (isEqualTo expected)
+              }
+          )
 
-    testAsync "Test safe observer stops after completed" {
-        // Arrange
-        let xs = fromNotification [ OnNext 1; OnCompleted; OnNext 2]
-        let obv = TestObserver<int>()
-        let safeObv = safeObserver obv AsyncDisposable.Empty
+          testAsync (
+              "safe observer stops after completed",
+              async {
+                  // Arrange
+                  let xs = fromNotification [ OnNext 1; OnCompleted; OnNext 2 ]
+                  let obv = TestObserver<int>()
+                  let safeObv = safeObserver obv AsyncDisposable.Empty
 
-        // Act
-        let! dispose = xs.SubscribeAsync safeObv
-        do! obv.AwaitIgnore ()
+                  // Act
+                  let! _dispose = xs.SubscribeAsync safeObv
+                  do! obv.AwaitIgnore()
 
-        // Assert
-        let actual = obv.Notifications |> Seq.toList
-        let expected = [ OnNext 1; OnCompleted ]
+                  // Assert
+                  let actual = obv.Notifications |> Seq.toList
+                  let expected = [ OnNext 1; OnCompleted ]
 
-        Expect.equal actual expected "Should be equal"
-    }
+                  assertThat actual (isEqualTo expected)
+              }
+          )
 
-    testAsync "Test safe observer stops after completed completed" {
-        // Arrange
-        let xs = fromNotification [ OnNext 1; OnCompleted; OnCompleted]
-        let obv = TestObserver<int>()
-        let safeObv = safeObserver obv AsyncDisposable.Empty
+          testAsync (
+              "safe observer stops after completed completed",
+              async {
+                  // Arrange
+                  let xs = fromNotification [ OnNext 1; OnCompleted; OnCompleted ]
+                  let obv = TestObserver<int>()
+                  let safeObv = safeObserver obv AsyncDisposable.Empty
 
-        // Act
-        let! dispose = xs.SubscribeAsync safeObv
-        do! obv.AwaitIgnore ()
+                  // Act
+                  let! _dispose = xs.SubscribeAsync safeObv
+                  do! obv.AwaitIgnore()
 
-        // Assert
-        let actual = obv.Notifications |> Seq.toList
-        let expected = [ OnNext 1; OnCompleted ]
+                  // Assert
+                  let actual = obv.Notifications |> Seq.toList
+                  let expected = [ OnNext 1; OnCompleted ]
 
-        Expect.equal actual expected "Should be equal"
-    }
+                  assertThat actual (isEqualTo expected)
+              }
+          )
 
-    testAsync "Test safe observer stops after error" {
-        // Arrange
-        let error = MyError "error"
-        let xs = fromNotification [ OnNext 1; OnError error; OnNext 2]
-        let obv = TestObserver<int>()
-        let safeObv = safeObserver obv AsyncDisposable.Empty
+          testAsync (
+              "safe observer stops after error",
+              async {
+                  // Arrange
+                  let error = MyError "error"
+                  let xs = fromNotification [ OnNext 1; OnError error; OnNext 2 ]
+                  let obv = TestObserver<int>()
+                  let safeObv = safeObserver obv AsyncDisposable.Empty
 
-        // Act
-        let! dispose = xs.SubscribeAsync safeObv
-        try
-            do! obv.AwaitIgnore ()
-        with
-        | _ -> ()
+                  // Act
+                  let! _dispose = xs.SubscribeAsync safeObv
 
-        // Assert
-        let actual = obv.Notifications |> Seq.toList
-        let expected = [ OnNext 1; OnError error ]
+                  try
+                      do! obv.AwaitIgnore()
+                  with _ ->
+                      ()
 
-        Expect.equal actual expected "Should be equal"
-    }
+                  // Assert
+                  let actual = obv.Notifications |> Seq.toList
+                  let expected = [ OnNext 1; OnError error ]
 
-    testAsync "Test safe observer stops after error error" {
-        // Arrange
-        let error = MyError "error"
-        let xs = fromNotification [ OnNext 1; OnError error; OnError error]
-        let obv = TestObserver<int>()
-        let safeObv = safeObserver obv AsyncDisposable.Empty
+                  assertThat actual (isEqualTo expected)
+              }
+          )
 
-        // Act
-        let! dispose = xs.SubscribeAsync safeObv
-        try
-            do! obv.AwaitIgnore ()
-        with
-        | _ -> ()
+          testAsync (
+              "safe observer stops after error error",
+              async {
+                  // Arrange
+                  let error = MyError "error"
+                  let xs = fromNotification [ OnNext 1; OnError error; OnError error ]
+                  let obv = TestObserver<int>()
+                  let safeObv = safeObserver obv AsyncDisposable.Empty
 
-        // Assert
-        let actual = obv.Notifications |> Seq.toList
-        let expected = [ OnNext 1; OnError error ]
+                  // Act
+                  let! _dispose = xs.SubscribeAsync safeObv
 
-        Expect.equal actual expected "Should be equal"
-    }
+                  try
+                      do! obv.AwaitIgnore()
+                  with _ ->
+                      ()
 
-    testAsync "Test auto-detach observer is disposing" {
-        // Arrange
-        let obv = TestObserver<int>()
-        let mutable disposed = false
+                  // Assert
+                  let actual = obv.Notifications |> Seq.toList
+                  let expected = [ OnNext 1; OnError error ]
 
-        let subscribeAsync (aobv : IAsyncObserver<int>) : Async<IReactiveDisposable> = async {
-            let worker = async {
-                for x in [1..5] do
-                    do! aobv.OnNextAsync x
-            }
-            Async.Start' worker
-            let cancel () = async {
-                disposed <- true
-            }
-            return AsyncDisposable.Create cancel
-        }
-        let source = { new IAsyncObservable<int> with member __.SubscribeAsync o = subscribeAsync o }
-        let xs = source |> Reactive.take 4
+                  assertThat actual (isEqualTo expected)
+              }
+          )
 
-        // Act
-        let! dispose = xs.SubscribeAsync obv
-        do! obv.AwaitIgnore ()
+          testAsync (
+              "auto-detach observer is disposing",
+              async {
+                  // Arrange
+                  let obv = TestObserver<int>()
+                  let mutable disposed = false
 
-        // Give dispose logic a run on the loop.
-        do! Async.Sleep 10
+                  let subscribeAsync (aobv: IAsyncObserver<int>) : Async<IReactiveDisposable> =
+                      async {
+                          let worker =
+                              async {
+                                  for x in [ 1..5 ] do
+                                      do! aobv.OnNextAsync x
+                              }
 
-        // Assert
-        let actual = obv.Notifications |> Seq.toList
-        let expected = [ OnNext 1; OnNext 2; OnNext 3; OnNext 4; OnCompleted ]
+                          Async.Start' worker
+                          let cancel () = async { disposed <- true }
+                          return AsyncDisposable.Create cancel
+                      }
 
-        Expect.isTrue disposed "Should be disposed"
-        Expect.equal actual expected "Should be equal"
-    }
-  ]
+                  let source =
+                      { new IAsyncObservable<int> with
+                          member _.SubscribeAsync o = subscribeAsync o }
 
+                  let xs = source |> Reactive.take 4
+
+                  // Act
+                  let! _dispose = xs.SubscribeAsync obv
+                  do! obv.AwaitIgnore()
+
+                  // Give dispose logic a run on the loop.
+                  do! Async.Sleep 10
+
+                  // Assert
+                  let actual = obv.Notifications |> Seq.toList
+                  let expected = [ OnNext 1; OnNext 2; OnNext 3; OnNext 4; OnCompleted ]
+
+                  assertThat disposed isTrue
+                  assertThat actual (isEqualTo expected)
+              }
+          ) ]
+    )

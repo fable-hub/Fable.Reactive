@@ -47,10 +47,10 @@ shipit *args:
 
 # --- Tests ---
 
+# One suite in test/, driven by Scriptorium: assertions from Scriptorium.Nib, runner from
+# Scriptorium.Quill. Quill is a plain executable rather than a `dotnet test` adapter, so the
+# suite is run with `dotnet run` and the process exit code is the result.
+
 # Run all tests
 test:
-    dotnet test
-
-# Run tests with coverage
-test-coverage:
-    dotnet test --collect:"XPlat Code Coverage"
+    dotnet run --project {{test_path}}

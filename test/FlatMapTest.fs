@@ -1,175 +1,216 @@
 module Tests.Bind
 
-open Fable.Reactive
+open Scriptorium.Quill
+open Scriptorium.Nib.Assertion
+open type Scriptorium.Quill.Test
 
-open Expecto
+open Fable.Reactive
 open Tests.Utils
 
-[<Tests>]
-let tests = testList "Filter Tests" [
+let tests =
+    testList (
+        "FlatMap",
+        [ testAsync (
+              "flatMap empty",
+              async {
+                  // Arrange
+                  let xs = Reactive.empty ()
+                  let zs = xs |> Reactive.flatMap id
+                  let obv = TestObserver<int>()
 
-    testAsync "Test flatMap empty" {
-        // Arrange
-        let xs = Reactive.empty ()
-        let zs = xs |> Reactive.flatMap (fun x -> x)
-        let obv = TestObserver<int>()
+                  // Act
+                  let! _sub = zs.SubscribeAsync obv
 
-        // Act
-        let! sub = zs.SubscribeAsync obv
-        try
-            do! obv.AwaitIgnore ()
-        with
-        | _ -> ()
+                  try
+                      do! obv.AwaitIgnore()
+                  with _ ->
+                      ()
 
-        // Assert
-        Expect.equal obv.Notifications.Count 1 "Wrong count"
-        let actual = obv.Notifications |> Seq.toList
-        let expected : Notification<int> list = [ OnCompleted ]
-        Expect.equal actual expected "Should be equal"
-    }
+                  // Assert
+                  let actual = obv.Notifications |> Seq.toList
+                  let expected: Notification<int> list = [ OnCompleted ]
+                  assertThat actual (isEqualTo expected)
+              }
+          )
 
-    testAsync "Test flatMap some" {
-        // Arrange
-        let xs = fromNotification [ OnNext 1; OnNext 2; OnNext 3; OnCompleted]
-        let zs = xs |> Reactive.flatMap (fun x -> Reactive.single x)
-        let obv = TestObserver<int>()
+          testAsync (
+              "flatMap some",
+              async {
+                  // Arrange
+                  let xs = fromNotification [ OnNext 1; OnNext 2; OnNext 3; OnCompleted ]
+                  let zs = xs |> Reactive.flatMap Reactive.single
+                  let obv = TestObserver<int>()
 
-        // Act
-        let! sub = zs.SubscribeAsync obv
-        do! obv.AwaitIgnore ()
+                  // Act
+                  let! _sub = zs.SubscribeAsync obv
+                  do! obv.AwaitIgnore()
 
-        // Assert
-        Expect.equal obv.Notifications.Count 4 "Wrong count"
-        let actual = obv.Notifications |> Seq.toList
-        let expected : Notification<int> list = [ OnNext 1; OnNext 2; OnNext 3; OnCompleted ]
-        Expect.containsAll actual expected "Should contain all"
-    }
+                  // Assert - inner subscriptions run concurrently, so order is not fixed
+                  let actual = obv.Notifications |> Seq.toList
 
-    /// return x >>= f is the same thing as f x
-    testAsync "Test flatMap monad law left identity" {
+                  assertThat
+                      actual
+                      (hasSize 4
+                       >> containAll [ OnNext 1; OnNext 2; OnNext 3; OnCompleted ])
+              }
+          )
 
-        // Arrange
-        let f x = Reactive.single (x * 10)
-        let xs = Reactive.single 42 |> Reactive.flatMap f
-        let ys = f 42
-        let obv1 = TestObserver<int>()
-        let obv2 = TestObserver<int>()
+          testAsync (
+              // return x >>= f is the same thing as f x
+              "flatMap monad law left identity",
+              async {
+                  // Arrange
+                  let f x = Reactive.single (x * 10)
+                  let xs = Reactive.single 42 |> Reactive.flatMap f
+                  let ys = f 42
+                  let obv1 = TestObserver<int>()
+                  let obv2 = TestObserver<int>()
 
-        // Act
-        do! xs.RunAsync obv1
-        let! x = obv1.Await ()
+                  // Act
+                  do! xs.RunAsync obv1
+                  let! x = obv1.Await()
 
-        do! ys.RunAsync obv2
-        let! y = obv2.Await ()
+                  do! ys.RunAsync obv2
+                  let! y = obv2.Await()
 
-        // Assert
-        Expect.equal x y "Should be equal"
-        Expect.equal x 420 "Should be equal"
-    }
+                  // Assert
+                  assertThat x (isEqualTo y)
+                  assertThat x (isEqualTo 420)
+              }
+          )
 
-    /// m >>= return is no different than just m
-    testAsync "Test flatMap monad law right identity" {
+          testAsync (
+              // m >>= return is no different than just m
+              "flatMap monad law right identity",
+              async {
+                  // Arrange
+                  let m = Reactive.single 42
+                  let xs = m |> Reactive.flatMap Reactive.single
+                  let obv1 = TestObserver<int>()
+                  let obv2 = TestObserver<int>()
 
-        // Arrange
-        let m = Reactive.single 42
-        let xs = m |> Reactive.flatMap Reactive.single
-        let obv1 = TestObserver<int>()
-        let obv2 = TestObserver<int>()
+                  // Act
+                  do! m.RunAsync obv1
+                  let! x = obv1.Await()
 
-        // Act
-        do! m.RunAsync obv1
-        let! x = obv1.Await ()
+                  do! xs.RunAsync obv2
+                  let! y = obv2.Await()
 
-        do! xs.RunAsync obv2
-        let! y = obv2.Await ()
+                  // Assert
+                  assertThat x (isEqualTo y)
+                  assertThat x (isEqualTo 42)
+              }
+          )
 
-        // Assert
-        Expect.equal x y "Should be equal"
-        Expect.equal x 42 "Should be equal"
-    }
+          testAsync (
+              // (m >>= f) >>= g is just like doing m >>= (\x -> f x >>= g)
+              "flatMap monad law associativity",
+              async {
+                  // Arrange
+                  let m = Reactive.single 42
+                  let f x = Reactive.single (x * 1000)
+                  let g x = Reactive.single (x * 42)
 
-    /// (m >>= f) >>= g is just like doing m >>= (\x -> f x >>= g)
-    testAsync "Test flatMap monad law associativity" {
-        // Arrange
-        let m = Reactive.single 42
-        let f x = Reactive.single (x * 1000)
-        let g x = Reactive.single (x * 42)
+                  let xs = m |> Reactive.flatMap f |> Reactive.flatMap g
 
-        let xs = m |> Reactive.flatMap f |> Reactive.flatMap g
-        let ys = m |> Reactive.flatMap (fun x -> f x |> Reactive.flatMap g)
+                  let ys =
+                      m
+                      |> Reactive.flatMap (fun x -> f x |> Reactive.flatMap g)
 
-        let obv1 = TestObserver<int>()
-        let obv2 = TestObserver<int>()
+                  let obv1 = TestObserver<int>()
+                  let obv2 = TestObserver<int>()
 
-        // Act
-        do! xs.RunAsync obv1
-        let! x = obv1.Await ()
+                  // Act
+                  do! xs.RunAsync obv1
+                  let! x = obv1.Await()
 
-        do! ys.RunAsync obv2
-        let! y = obv2.Await ()
+                  do! ys.RunAsync obv2
+                  let! y = obv2.Await()
 
-        // Assert
-        Expect.equal x y "Should be equal"
-        Expect.equal x 1764000 "Should be equal"
-    }
+                  // Assert
+                  assertThat x (isEqualTo y)
+                  assertThat x (isEqualTo 1764000)
+              }
+          )
 
-    testAsync "Test flatMap expression some" {
-        // Arrange
-        let xs = fromNotification [ OnNext 1; OnNext 2; OnNext 3; OnCompleted]
-        let ys = reactive {
-            let! x = xs
-            yield x * 2
-        }
-        let obv = TestObserver<int>()
+          testAsync (
+              "flatMap expression with let!",
+              async {
+                  // Arrange
+                  let xs = fromNotification [ OnNext 1; OnNext 2; OnNext 3; OnCompleted ]
 
-        // Act
-        let! sub = ys.SubscribeAsync obv
-        do! obv.AwaitIgnore ()
+                  let ys =
+                      reactive {
+                          let! x = xs
+                          yield x * 2
+                      }
 
-        // Assert
-        Expect.equal obv.Notifications.Count 4 "Wrong count"
-        let actual = obv.Notifications |> Seq.toList
-        let expected : Notification<int> list = [ OnNext 2; OnNext 4; OnNext 6; OnCompleted ]
-        Expect.containsAll actual expected "Should contain all"
-    }
+                  let obv = TestObserver<int>()
 
-    testAsync "Test flatMap expression some for" {
-        // Arrange
-        let xs = fromNotification [ OnNext 1; OnNext 2; OnNext 3; OnCompleted]
-        let ys = reactive {
-            for x in xs do
-                yield x * 2
-        }
-        let obv = TestObserver<int>()
+                  // Act
+                  let! _sub = ys.SubscribeAsync obv
+                  do! obv.AwaitIgnore()
 
-        // Act
-        let! sub = ys.SubscribeAsync obv
-        do! obv.AwaitIgnore ()
+                  // Assert
+                  let actual = obv.Notifications |> Seq.toList
 
-        // Assert
-        Expect.equal obv.Notifications.Count 4 "Wrong count"
-        let actual = obv.Notifications |> Seq.toList
-        let expected : Notification<int> list = [ OnNext 2; OnNext 4; OnNext 6; OnCompleted ]
-        Expect.equal actual expected "Should be equal"
-    }
+                  assertThat
+                      actual
+                      (hasSize 4
+                       >> containAll [ OnNext 2; OnNext 4; OnNext 6; OnCompleted ])
+              }
+          )
 
-    testAsync "Test flatMap expression some return bang" {
-        // Arrange
-        let xs = fromNotification [ OnNext 1; OnNext 2; OnNext 3; OnCompleted]
-        let ys = reactive {
-            let! x = xs
-            yield! Reactive.single (x * 2)
-        }
-        let obv = TestObserver<int>()
+          testAsync (
+              "flatMap expression with for",
+              async {
+                  // Arrange
+                  let xs = fromNotification [ OnNext 1; OnNext 2; OnNext 3; OnCompleted ]
 
-        // Act
-        let! sub = ys.SubscribeAsync obv
-        do! obv.AwaitIgnore ()
+                  let ys =
+                      reactive {
+                          for x in xs do
+                              yield x * 2
+                      }
 
-        // Assert
-        Expect.equal obv.Notifications.Count 4 "Wrong count"
-        let actual = obv.Notifications |> Seq.toList
-        let expected : Notification<int> list = [ OnNext 2; OnNext 4; OnNext 6; OnCompleted ]
-        Expect.containsAll actual expected "Should contain all"
-    }
-]
+                  let obv = TestObserver<int>()
+
+                  // Act
+                  let! _sub = ys.SubscribeAsync obv
+                  do! obv.AwaitIgnore()
+
+                  // Assert
+                  let actual = obv.Notifications |> Seq.toList
+                  let expected: Notification<int> list = [ OnNext 2; OnNext 4; OnNext 6; OnCompleted ]
+                  assertThat actual (isEqualTo expected)
+              }
+          )
+
+          testAsync (
+              "flatMap expression with yield!",
+              async {
+                  // Arrange
+                  let xs = fromNotification [ OnNext 1; OnNext 2; OnNext 3; OnCompleted ]
+
+                  let ys =
+                      reactive {
+                          let! x = xs
+                          yield! Reactive.single (x * 2)
+                      }
+
+                  let obv = TestObserver<int>()
+
+                  // Act
+                  let! _sub = ys.SubscribeAsync obv
+                  do! obv.AwaitIgnore()
+
+                  // Assert
+                  let actual = obv.Notifications |> Seq.toList
+
+                  assertThat
+                      actual
+                      (hasSize 4
+                       >> containAll [ OnNext 2; OnNext 4; OnNext 6; OnCompleted ])
+              }
+          ) ]
+    )

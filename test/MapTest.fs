@@ -1,82 +1,84 @@
 module Tests.Map
 
+open Scriptorium.Quill
+open Scriptorium.Nib.Assertion
+open type Scriptorium.Quill.Test
+
 open Fable.Reactive
 open Tests.Utils
 
-open Expecto
-
 exception MyError of string
 
-[<Tests>]
-let tests = testList "Map Tests" [
+let tests =
+    testList (
+        "Map",
+        [ testAsync (
+              "mapAsync",
+              async {
+                  // Arrange
+                  let mapper x = async { return x * 10 }
 
-    testAsync "Test map async" {
-        // Arrange
-        let mapper x =
-            async {
-                return x * 10
-            }
+                  let xs = Reactive.single 42 |> Reactive.mapAsync mapper
+                  let obv = TestObserver<int>()
 
-        let xs =
-            Reactive.single 42
-            |> Reactive.mapAsync mapper
-        let obv = TestObserver<int>()
+                  // Act
+                  let! _sub = xs.SubscribeAsync obv
+                  let! latest = obv.Await()
 
-        // Act
-        let! sub = xs.SubscribeAsync obv
-        let! latest= obv.Await ()
+                  // Assert
+                  assertThat latest (isEqualTo 420)
+                  let actual = obv.Notifications |> Seq.toList
+                  let expected: Notification<int> list = [ OnNext 420; OnCompleted ]
+                  assertThat actual (isEqualTo expected)
+              }
+          )
 
-        // Assert
-        Expect.equal latest 420 "Should be equal"
-        Expect.equal obv.Notifications.Count 2 "Wrong count"
-        let actual = obv.Notifications |> Seq.toList
-        let expected : Notification<int> list = [ OnNext 420; OnCompleted ]
-        Expect.equal actual expected "Should be equal"
-    }
+          testAsync (
+              "map",
+              async {
+                  // Arrange
+                  let mapper x = x * 10
 
-    testAsync "Test map sync" {
-        // Arrange
-        let mapper x =
-            x * 10
+                  let xs = Reactive.single 42 |> Reactive.map mapper
+                  let obv = TestObserver<int>()
 
-        let xs = Reactive.single 42 |> Reactive.map mapper
-        let obv = TestObserver<int>()
+                  // Act
+                  let! _sub = xs.SubscribeAsync obv
+                  let! latest = obv.Await()
 
-        // Act
-        let! sub = xs.SubscribeAsync obv
-        let! latest= obv.Await ()
+                  // Assert
+                  assertThat latest (isEqualTo 420)
+                  let actual = obv.Notifications |> Seq.toList
+                  let expected: Notification<int> list = [ OnNext 420; OnCompleted ]
+                  assertThat actual (isEqualTo expected)
+              }
+          )
 
-        // Assert
-        Expect.equal latest 420 "Should be equal"
-        Expect.equal obv.Notifications.Count 2 "Wrong count"
-        let actual = obv.Notifications |> Seq.toList
-        let expected : Notification<int> list = [ OnNext 420; OnCompleted ]
-        Expect.equal actual expected "Should be equal"
-    }
+          testAsync (
+              "map mapper throws exception",
+              async {
+                  // Arrange
+                  let error = MyError "error"
+                  let mapper _ = async { raise error }
 
-    testAsync "Test map mapper throws exception" {
-        // Arrange
-        let error = MyError "error"
-        let mapper x =
-            async {
-                raise error
-            }
+                  let xs =
+                      Reactive.single "error"
+                      |> Reactive.mapAsync mapper
 
-        let xs = Reactive.single "error" |> Reactive.mapAsync mapper
-        let obv = TestObserver<unit>()
+                  let obv = TestObserver<unit>()
 
-        // Act
-        let! cnl = xs.SubscribeAsync obv
+                  // Act
+                  let! _sub = xs.SubscribeAsync obv
 
-        try
-            do! obv.AwaitIgnore ()
-        with
-        | _ -> ()
+                  try
+                      do! obv.AwaitIgnore()
+                  with _ ->
+                      ()
 
-        // Assert
-        Expect.equal obv.Notifications.Count 1 "Wrong count"
-        let actual = obv.Notifications |> Seq.toList
-        let expected : Notification<unit> list = [ OnError error ]
-        Expect.equal actual expected "Should be equal"
-    }
-]
+                  // Assert
+                  let actual = obv.Notifications |> Seq.toList
+                  let expected: Notification<unit> list = [ OnError error ]
+                  assertThat actual (isEqualTo expected)
+              }
+          ) ]
+    )

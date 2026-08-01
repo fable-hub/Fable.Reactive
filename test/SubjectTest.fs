@@ -1,116 +1,151 @@
-﻿module Tests.SubjectTest
+module Tests.SubjectTest
+
+open Scriptorium.Quill
+open Scriptorium.Nib.Assertion
+open type Scriptorium.Quill.Test
 
 open Fable.Reactive
-
-open Expecto
 open Tests.Utils
 
 exception TestExn of unit
 
-[<Tests>]
-let tests = testList "Subject Tests" [
+let tests =
+    testList (
+        "Subject",
+        [ testAsync (
+              "subject broadcasts completion to all observers",
+              async {
+                  // Arrange
+                  let dispatch, stream = Reactive.subject ()
+                  let obv1 = TestObserver<int>()
+                  let obv2 = TestObserver<int>()
 
-    testAsync "Test subject broadcasts completeness to all observers" {
-        // Arrange
-        let (dispatch, stream) = Reactive.subject ()
-        let obv1 = TestObserver<int>()
-        let obv2 = TestObserver<int>()
+                  let! _ = stream.SubscribeAsync obv1
+                  let! _ = stream.SubscribeAsync obv2
 
-        let! _ = stream.SubscribeAsync(obv1)
-        let! _ = stream.SubscribeAsync(obv2)
+                  // Act
+                  do! dispatch.OnCompletedAsync()
 
-        do! dispatch.OnCompletedAsync()
+                  do! obv1.AwaitIgnore()
+                  do! obv2.AwaitIgnore()
 
-        do! obv1.AwaitIgnore()
-        do! obv2.AwaitIgnore()
+                  // Assert
+                  let actual1 = obv1.Notifications |> Seq.toList
+                  let actual2 = obv2.Notifications |> Seq.toList
+                  let expected = [ OnCompleted ]
 
-        let actual1 = obv1.Notifications |> Seq.toList
-        let actual2 = obv1.Notifications |> Seq.toList
-        let expected = [ OnCompleted ]
+                  assertThat actual1 (isEqualTo expected)
+                  assertThat actual2 (isEqualTo expected)
+              }
+          )
 
-        Expect.equal actual1 expected "Should be equal"
-        Expect.equal actual1 actual2 "Should be equal"
-    }
+          testAsync (
+              "subject broadcasts error to all observers",
+              async {
+                  // Arrange
+                  let dispatch, stream = Reactive.subject ()
+                  let obv1 = TestObserver<int>()
+                  let obv2 = TestObserver<int>()
 
-    testAsync "Test subject broadcasts error to all observers" {
-        // Arrange
-        let (dispatch, stream) = Reactive.subject ()
-        let obv1 = TestObserver<int>()
-        let obv2 = TestObserver<int>()
+                  let! _ = stream.SubscribeAsync obv1
+                  let! _ = stream.SubscribeAsync obv2
 
-        let! _ = stream.SubscribeAsync(obv1)
-        let! _ = stream.SubscribeAsync(obv2)
+                  // Act
+                  do! dispatch.OnErrorAsync(TestExn())
 
-        do! dispatch.OnErrorAsync(TestExn ())
+                  try
+                      do! obv1.AwaitIgnore()
+                  with _ ->
+                      ()
 
-        try 
-            do! obv1.AwaitIgnore()
-        with _ -> ()
-        try 
-            do! obv2.AwaitIgnore()
-        with _ -> ()
+                  try
+                      do! obv2.AwaitIgnore()
+                  with _ ->
+                      ()
 
-        let actual1 = obv1.Notifications |> Seq.toList
-        let actual2 = obv1.Notifications |> Seq.toList
-        let expected = [ OnError (TestExn ()) ]
+                  // Assert
+                  let actual1 = obv1.Notifications |> Seq.toList
+                  let actual2 = obv2.Notifications |> Seq.toList
+                  let expected = [ OnError(TestExn()) ]
 
-        Expect.equal actual1 expected "Should be equal"
-        Expect.equal actual1 actual2 "Should be equal"
-    }
+                  assertThat actual1 (isEqualTo expected)
+                  assertThat actual2 (isEqualTo expected)
+              }
+          )
 
-    testAsync "Test subject does not broadcast error when first observer is throws" {
-        // Arrange
-        let (dispatch, stream) = Reactive.subject ()
-        let obv1 = TestObserver<int>()
-        let obv2 = TestObserver<int>()
+          testAsync (
+              "subject does not broadcast error when the first observer throws",
+              async {
+                  // Arrange
+                  let dispatch, stream = Reactive.subject ()
+                  let obv1 = TestObserver<int>()
+                  let obv2 = TestObserver<int>()
 
-        let! _ = stream.SubscribeAsync(function | OnNext _ -> raise (TestExn ()) | n -> obv1.PostAsync n)
-        let! _ = stream.SubscribeAsync(obv2)
+                  let! _ =
+                      stream.SubscribeAsync (function
+                          | OnNext _ -> raise (TestExn())
+                          | n -> obv1.PostAsync n)
 
-        do! dispatch.OnNextAsync(1)
-        do! dispatch.OnCompletedAsync()
+                  let! _ = stream.SubscribeAsync obv2
 
-        try 
-            do! obv1.AwaitIgnore()
-        with _ -> ()
-        try 
-            do! obv2.AwaitIgnore()
-        with _ -> ()
+                  // Act
+                  do! dispatch.OnNextAsync 1
+                  do! dispatch.OnCompletedAsync()
 
-        let actual1 = obv1.Notifications |> Seq.toList
-        let expected1 = [ OnError (TestExn ()) ]
-        let actual2 = obv2.Notifications |> Seq.toList
-        let expected2 = [ OnNext 1; OnCompleted ]
+                  try
+                      do! obv1.AwaitIgnore()
+                  with _ ->
+                      ()
 
-        Expect.equal actual1 expected1 "Should be equal"
-        Expect.equal actual2 expected2 "Should be equal"
-    }
+                  try
+                      do! obv2.AwaitIgnore()
+                  with _ ->
+                      ()
 
-    testAsync "Test subject does not broadcast error when second observer is throws" {
-        // Arrange
-        let (dispatch, stream) = Reactive.subject ()
-        let obv1 = TestObserver<int>()
-        let obv2 = TestObserver<int>()
+                  // Assert
+                  let actual1 = obv1.Notifications |> Seq.toList
+                  let actual2 = obv2.Notifications |> Seq.toList
 
-        let! _ = stream.SubscribeAsync(obv1)
-        let! _ = stream.SubscribeAsync(function | OnNext _ -> raise (TestExn ()) | n -> obv2.PostAsync n)
+                  assertThat actual1 (isEqualTo [ OnError(TestExn()) ])
+                  assertThat actual2 (isEqualTo [ OnNext 1; OnCompleted ])
+              }
+          )
 
-        do! dispatch.OnNextAsync(1)
-        do! dispatch.OnCompletedAsync()
+          testAsync (
+              "subject does not broadcast error when the second observer throws",
+              async {
+                  // Arrange
+                  let dispatch, stream = Reactive.subject ()
+                  let obv1 = TestObserver<int>()
+                  let obv2 = TestObserver<int>()
 
-        try 
-            do! obv1.AwaitIgnore()
-        with _ -> ()
-        try 
-            do! obv2.AwaitIgnore()
-        with _ -> ()
+                  let! _ = stream.SubscribeAsync obv1
 
-        let actual1 = obv1.Notifications |> Seq.toList
-        let expected1 = [ OnNext 1; OnCompleted ]
-        let actual2 = obv2.Notifications |> Seq.toList
-        let expected2 = [ OnError (TestExn ()) ]
+                  let! _ =
+                      stream.SubscribeAsync (function
+                          | OnNext _ -> raise (TestExn())
+                          | n -> obv2.PostAsync n)
 
-        Expect.equal actual1 expected1 "Should be equal"
-        Expect.equal actual2 expected2 "Should be equal"
-    }
-]
+                  // Act
+                  do! dispatch.OnNextAsync 1
+                  do! dispatch.OnCompletedAsync()
+
+                  try
+                      do! obv1.AwaitIgnore()
+                  with _ ->
+                      ()
+
+                  try
+                      do! obv2.AwaitIgnore()
+                  with _ ->
+                      ()
+
+                  // Assert
+                  let actual1 = obv1.Notifications |> Seq.toList
+                  let actual2 = obv2.Notifications |> Seq.toList
+
+                  assertThat actual1 (isEqualTo [ OnNext 1; OnCompleted ])
+                  assertThat actual2 (isEqualTo [ OnError(TestExn()) ])
+              }
+          ) ]
+    )
