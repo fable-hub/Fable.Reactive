@@ -94,7 +94,7 @@ module internal Combine =
                         }
 
                     let rec messageLoop (model: Model<'TSource>) =
-                        async {
+                        actor {
                             let! msg = inbox.Receive()
                             let! newModel = update msg model
                             return! messageLoop newModel
@@ -151,7 +151,7 @@ module internal Combine =
             let agent =
                 Actor.spawn (fun inbox ->
                     let rec messageLoop (source: option<'TSource>) (other: option<'TOther>) =
-                        async {
+                        actor {
                             let! cn = inbox.Receive()
 
                             let onNextOption n =
@@ -219,7 +219,7 @@ module internal Combine =
             let agent =
                 Actor.spawn (fun inbox ->
                     let rec messageLoop (latest: option<'TOther>) =
-                        async {
+                        actor {
                             let! cn = inbox.Receive()
 
                             let onNextOption n =

@@ -41,19 +41,19 @@ module internal ActorInterop =
                 let emit value =
                     dispatch.OnNextAsync value |> Async.Start'
 
-                // Shared mutable ref — upstream posts directly to the child actor.
-                // Monitor swaps the ref on Restart.
-                let childRef = ref Unchecked.defaultof<Actor<'TSource>>
-                let ready = System.Threading.Tasks.TaskCompletionSource<unit>()
-
-                // Monitor actor: receives ChildExited and applies the supervision directive.
+                // Monitor actor: spawns and supervises the child, swaps it on
+                // Restart, and forwards upstream values to it. Routing values
+                // through the monitor means the child is always set before the
+                // first value is dequeued, so no external readiness handshake is
+                // needed — and upstream can never post to a stale child during a
+                // restart. The monitor is Actor<obj>, carrying both ChildExited
+                // signals and forwarded 'TSource values.
                 let monitor =
                     Actor.spawn (fun inbox ->
-                        childRef.Value <- Actor.spawnLinked inbox (handler emit)
-                        ready.SetResult()
+                        let mutable child = Actor.spawnLinked inbox (handler emit)
 
                         let rec loop () =
-                            async {
+                            actor {
                                 let! msg = inbox.Receive()
 
                                 match Actor.tryAsChildExited msg with
@@ -66,19 +66,17 @@ module internal ActorInterop =
                                     match decide ex with
                                     | Directive.Escalate -> do! aobv.OnErrorAsync ex
                                     | Directive.Stop -> ()
-                                    | Directive.Restart -> childRef.Value <- Actor.spawnLinked inbox (handler emit)
-                                | None -> ()
+                                    | Directive.Restart -> child <- Actor.spawnLinked inbox (handler emit)
+                                | None -> child.Post(unbox<'TSource> msg)
 
                                 return! loop ()
                             }
 
                         loop ())
 
-                do! Async.AwaitTask ready.Task
-
                 let obv =
                     { new IAsyncObserver<'TSource> with
-                        member _.OnNextAsync x = async { childRef.Value.Post x }
+                        member _.OnNextAsync x = async { monitor.Post(box x) }
                         member _.OnErrorAsync err = aobv.OnErrorAsync err
                         member _.OnCompletedAsync() = aobv.OnCompletedAsync() }
 
@@ -116,7 +114,7 @@ module internal ActorInterop =
                 let actor =
                     Actor.spawn (fun inbox ->
                         let rec loop state =
-                            async {
+                            actor {
                                 let! (value, rc: ReplyChannel<'TResult>) = inbox.Receive()
                                 let state', result = handler state value
                                 rc.Reply result
@@ -129,7 +127,7 @@ module internal ActorInterop =
                     { new IAsyncObserver<'TSource> with
                         member _.OnNextAsync x =
                             async {
-                                let! result = Actor.call actor x
+                                let! result = Actor.callAsync actor x
                                 do! aobv.OnNextAsync result
                             }
 
