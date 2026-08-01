@@ -65,7 +65,10 @@ let tests =
                   // Act
                   let! _sub = debounced.SubscribeAsync obv
                   do! dispatch.OnNextAsync 1
-                  do! Async.Sleep 100
+                  // Wait for the debounce window to actually elapse and emit. A fixed sleep
+                  // races: on a loaded runner the timer can be starved past any margin, and
+                  // completing first makes debounce drop the pending value.
+                  do! obv.WaitUntil(List.contains (OnNext 1))
                   do! dispatch.OnCompletedAsync()
                   do! obv.AwaitIgnore()
 
@@ -81,13 +84,15 @@ let tests =
               async {
                   // Arrange
                   let dispatch, source = Reactive.subject<int> ()
-                  let debounced = source |> Reactive.debounce 200
+                  let debounced = source |> Reactive.debounce 2000
                   let obv = TestObserver<int>()
 
                   // Act
                   let! sub = debounced.SubscribeAsync obv
                   do! dispatch.OnNextAsync 1
-                  // Dispose before the debounce timer (200ms) fires
+                  // Dispose well before the debounce timer fires. This one can only be a
+                  // margin, not a condition — it asserts a negative — so the window is wide
+                  // enough that a stalled runner cannot overshoot it.
                   do! Async.Sleep 50
                   do! sub.DisposeAsync()
                   // Wait past what would have been the debounce period

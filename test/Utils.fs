@@ -35,6 +35,7 @@ type ITestObserver<'a> =
     abstract Notifications: ResizeArray<Notification<'a>>
     abstract PostAsync: Notification<'a> -> Async<unit>
     abstract Refresh: unit -> Async<unit>
+    abstract WaitUntil: (Notification<'a> list -> bool) -> Async<unit>
     abstract Await: unit -> Async<'a>
     abstract AwaitIgnore: unit -> Async<unit>
 
@@ -113,6 +114,25 @@ let TestObserver<'a> () : ITestObserver<'a> =
                 let! snap = Actor.callAsync store Get
                 cached <- ResizeArray(snap.Notifications)
             }
+
+        /// Poll until the notifications so far satisfy the predicate, refreshing the
+        /// cache as it goes. Prefer this over `Async.Sleep n` for "wait until the value
+        /// shows up": a loaded CI runner can starve a timer past any fixed margin, and
+        /// Quill's own timeout is what fails the test if the value never arrives.
+        member _.WaitUntil(predicate) =
+            let rec loop () =
+                async {
+                    let! snap = Actor.callAsync store Get
+                    cached <- ResizeArray(snap.Notifications)
+
+                    if predicate snap.Notifications then
+                        return ()
+                    else
+                        do! Async.Sleep 5
+                        return! loop ()
+                }
+
+            loop ()
 
         /// Wait until the stream completes, then return the latest OnNext value.
         /// Re-raises if the stream errored.

@@ -131,9 +131,23 @@ let tests =
 
                   // Act
                   let! sub = zs.SubscribeAsync obv
-                  do! Async.Sleep 100 // Let error propagate and switch to fallback
-                  do! dispatch.OnNextAsync 42
-                  do! Async.Sleep 100
+
+                  // The switch to the fallback happens asynchronously after the source errors,
+                  // and `subject` is hot — anything dispatched before it has a subscriber is
+                  // dropped on the floor. There is no observable signal for "the fallback is
+                  // live", so re-dispatch until one lands instead of guessing at a sleep.
+                  // Duplicates are harmless: the assertion is containment.
+                  let rec dispatchUntilFallbackLive () =
+                      async {
+                          do! dispatch.OnNextAsync 42
+                          do! Async.Sleep 10
+                          do! obv.Refresh()
+
+                          if not (obv.Notifications |> Seq.contains (OnNext 42)) then
+                              return! dispatchUntilFallbackLive ()
+                      }
+
+                  do! dispatchUntilFallbackLive ()
 
                   // Dispose should dispose the current (fallback) subscription, not the stale original
                   do! sub.DisposeAsync()
