@@ -30,6 +30,11 @@ let isOnCompleted (n: Notification<'a>) =
     | OnCompleted -> true
     | _ -> false
 
+let isOnError (n: Notification<'a>) =
+    match n with
+    | OnError _ -> true
+    | _ -> false
+
 /// Immutable snapshot of the observer state, returned across the process boundary.
 type private Snapshot<'a> =
     { Notifications: Notification<'a> list

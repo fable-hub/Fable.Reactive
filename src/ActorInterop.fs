@@ -41,6 +41,17 @@ module internal ActorInterop =
                 let emit value =
                     dispatch.OnNextAsync value |> Async.Start'
 
+                // Terminating downstream must never itself throw: nothing supervises the
+                // monitor, so an exception escaping here would kill it silently — the very
+                // failure this is here to report.
+                let escalate (ex: exn) =
+                    async {
+                        try
+                            do! aobv.OnErrorAsync ex
+                        with _ ->
+                            ()
+                    }
+
                 // Monitor actor: spawns and supervises the child, swaps it on
                 // Restart, and forwards upstream values to it. Routing values
                 // through the monitor means the child is always set before the
@@ -61,25 +72,42 @@ module internal ActorInterop =
                             actor {
                                 let! msg = inbox.Receive()
 
-                                match Actor.tryAsChildExited msg with
-                                | Some exited ->
-                                    let ex =
-                                        match exited.Reason with
-                                        | :? exn as e -> e
-                                        | r -> ProcessExitException(sprintf "%A" r)
+                                // The monitor is the top of this supervision tree — nothing
+                                // watches it in turn. Left bare, a throw from the user's `decide`,
+                                // from `OnErrorAsync`, or from the cast would kill the loop and
+                                // leave the subscription hanging with no terminal notification:
+                                // upstream keeps posting into a mailbox nobody reads. Report the
+                                // failure downstream and stop instead.
+                                let! alive =
+                                    actor {
+                                        try
+                                            match Actor.tryAsChildExited msg with
+                                            | Some exited ->
+                                                let ex =
+                                                    match exited.Reason with
+                                                    | :? exn as e -> e
+                                                    | r -> ProcessExitException(sprintf "%A" r)
 
-                                    match decide ex with
-                                    | Directive.Escalate -> do! aobv.OnErrorAsync ex
-                                    | Directive.Stop -> ()
-                                    | Directive.Restart -> child <- Actor.spawnLinked inbox (handler emit)
-                                // Anything that is not a ChildExited is an upstream value: both
-                                // backends deliver exits pre-converted (BEAM's receive_msg turns
-                                // trapped EXIT signals into ChildExited and drops `normal` ones,
-                                // .NET's spawnLinked posts one from its crash handler), so nothing
-                                // else can reach this mailbox.
-                                | None -> child.Post(unbox<'TSource> msg)
+                                                match decide ex with
+                                                | Directive.Escalate -> do! escalate ex
+                                                | Directive.Stop -> ()
+                                                | Directive.Restart -> child <- Actor.spawnLinked inbox (handler emit)
+                                            // Anything that is not a ChildExited is an upstream
+                                            // value: both backends deliver exits pre-converted
+                                            // (BEAM's receive_msg turns trapped EXIT signals into
+                                            // ChildExited and drops `normal` ones, .NET's
+                                            // spawnLinked posts one from its crash handler), so
+                                            // nothing else can reach this mailbox.
+                                            | None -> child.Post(unbox<'TSource> msg)
 
-                                return! loop ()
+                                            return true
+                                        with ex ->
+                                            do! escalate ex
+                                            return false
+                                    }
+
+                                if alive then
+                                    return! loop ()
                             }
 
                         loop ())

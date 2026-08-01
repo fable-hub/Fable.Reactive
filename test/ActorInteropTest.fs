@@ -209,6 +209,44 @@ let tests =
           )
 
           testAsync (
+              "flatMapActorSupervised escalates a throwing decider instead of hanging",
+              async {
+                  // The decider is user code running inside the monitor loop. Before the monitor
+                  // caught its own failures, a throw here killed the supervisor silently and the
+                  // subscription hung forever with no terminal notification — this test would
+                  // then fail on Quill's timeout rather than on the assertion.
+                  let xs = fromNotification [ OnNext 1 ]
+                  let deciderError = System.InvalidOperationException("decider boom")
+
+                  let result =
+                      xs
+                      |> Reactive.flatMapActorSupervised (fun _ -> raise deciderError) (fun emit inbox ->
+                          let rec loop () =
+                              actor {
+                                  let! x = inbox.Receive()
+                                  failwith "child boom"
+                                  emit x
+                                  return! loop ()
+                              }
+
+                          loop ())
+
+                  let obv = TestObserver<int>()
+                  let! _sub = result.SubscribeAsync obv
+                  do! obv.WaitUntil(List.exists isOnError)
+
+                  // The decider's own failure is what reaches downstream, not the child's.
+                  let reported =
+                      obv.Notifications
+                      |> Seq.tryPick (function
+                          | OnError e -> Some e.Message
+                          | _ -> None)
+
+                  assertThat reported (isEqualTo (Some "decider boom"))
+              }
+          )
+
+          testAsync (
               "flatMapActor forwards actor crash as OnError",
               async {
                   let xs = fromNotification [ OnNext 1; OnCompleted ]
