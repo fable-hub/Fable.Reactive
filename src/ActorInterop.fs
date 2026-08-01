@@ -50,6 +50,11 @@ module internal ActorInterop =
                 // signals and forwarded 'TSource values.
                 let monitor =
                     Actor.spawn (fun inbox ->
+                        // Required on BEAM, where spawnLinked is a bare spawn_link: without exit
+                        // trapping a child crash kills the monitor instead of arriving as a
+                        // ChildExited message, so no directive would ever run. No-op elsewhere.
+                        Actor.trapExits ()
+
                         let mutable child = Actor.spawnLinked inbox (handler emit)
 
                         let rec loop () =
@@ -67,6 +72,11 @@ module internal ActorInterop =
                                     | Directive.Escalate -> do! aobv.OnErrorAsync ex
                                     | Directive.Stop -> ()
                                     | Directive.Restart -> child <- Actor.spawnLinked inbox (handler emit)
+                                // Anything that is not a ChildExited is an upstream value: both
+                                // backends deliver exits pre-converted (BEAM's receive_msg turns
+                                // trapped EXIT signals into ChildExited and drops `normal` ones,
+                                // .NET's spawnLinked posts one from its crash handler), so nothing
+                                // else can reach this mailbox.
                                 | None -> child.Post(unbox<'TSource> msg)
 
                                 return! loop ()
