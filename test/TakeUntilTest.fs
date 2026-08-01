@@ -25,18 +25,25 @@ let tests =
 
                   // Act
                   let! _sub = zs.SubscribeAsync obv
-                  do! Async.Sleep 100
                   do! obvX.OnNextAsync 1
                   do! obvX.OnNextAsync 2
+
+                  // `xs` and `ys` are independent subjects whose delivery chains converge on the
+                  // single safeObserver inside `takeUntil`, so nothing orders the notifier's
+                  // OnCompleted against values still in flight from `xs`. Let them land before
+                  // tripping the notifier — once safeObserver sees a terminal notification it
+                  // marks the stream stopped and silently drops everything after it.
+                  do! obv.WaitUntil(fun ns -> ns |> List.filter isOnNext |> List.length = 2)
+
                   do! obvY.OnNextAsync true
-                  do! Async.Sleep 500
+                  do! obv.WaitUntil(List.exists isOnCompleted)
+
+                  // Values posted after the notifier must be dropped. That is a negative, so
+                  // there is no condition to poll on — a plain sleep is the only wait available.
                   do! obvX.OnNextAsync 3
                   do! obvX.OnCompletedAsync()
-
-                  try
-                      do! obv.AwaitIgnore()
-                  with _ ->
-                      ()
+                  do! Async.Sleep 200
+                  do! obv.Refresh()
 
                   // Assert
                   let actual = obv.Notifications |> Seq.toList

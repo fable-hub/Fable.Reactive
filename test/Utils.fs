@@ -18,6 +18,18 @@ let containAll (expected: 'a list) : Assertion<'a list> =
             |> List.forall (fun e -> List.contains e xs))
         (fun xs -> $"given %A{xs} should contain all of %A{expected}")
 
+/// Notification kind predicates. Handy for `WaitUntil` conditions, where the question is
+/// "have N values landed yet?" rather than "what are they?".
+let isOnNext (n: Notification<'a>) =
+    match n with
+    | OnNext _ -> true
+    | _ -> false
+
+let isOnCompleted (n: Notification<'a>) =
+    match n with
+    | OnCompleted -> true
+    | _ -> false
+
 /// Immutable snapshot of the observer state, returned across the process boundary.
 type private Snapshot<'a> =
     { Notifications: Notification<'a> list
