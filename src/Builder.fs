@@ -41,6 +41,9 @@ module QueryBuilder =
     let reactive = QueryBuilder()
 
     /// We extend AsyncBuilder to use `use!` for resource managemnt when using async builder.
+    ///
+    /// decision: bridges synchronous TryFinally cleanup to async disposal with fire-and-forget execution
+    /// tradeoff: disposal is best-effort because Async.TryFinally cannot await its compensation callback
     type AsyncBuilder with
 
         member builder.Using(resource: #IReactiveDisposable, f: #IReactiveDisposable -> Async<'TSource>) =

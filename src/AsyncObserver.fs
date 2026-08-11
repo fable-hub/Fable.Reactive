@@ -44,6 +44,9 @@ module AsyncObserver =
 
     /// Safe observer that wraps the given observer. Makes sure that invocations are serialized and that the Rx grammar
     /// (OnNext* (OnError|OnCompleted)?) is not violated.
+    ///
+    /// decision: serializes callbacks through one actor because upstream notifications may arrive concurrently
+    /// invariant: the wrapped observer receives no callback after its first OnError or OnCompleted callback
     let safeObserver (obv: IAsyncObserver<'TSource>) (disposable: IReactiveDisposable) : IAsyncObserver<'TSource> =
         let agent =
             Actor.spawn (fun inbox ->
@@ -117,6 +120,7 @@ module AsyncObserver =
         let safeObv = AsyncDisposable.Create cancel |> safeObserver obv
 
         // Auto-detaches (disposes) the disposable when the observer completes with success or error.
+        // decision: registers subscriptions with an actor so terminal signals and explicit disposal serialize
         let autoDetach (disposable: Async<IReactiveDisposable>) =
             async {
                 let! disp = disposable

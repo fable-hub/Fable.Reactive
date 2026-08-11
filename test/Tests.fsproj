@@ -20,6 +20,7 @@
     <Compile Include="ScanTest.fs" />
     <Compile Include="SubjectTest.fs" />
     <Compile Include="TakeUntilTest.fs" />
+    <!-- decision: excludes AsyncSeq tests from Fable builds because they depend on .NET synchronization primitives -->
     <Compile Include="AsyncSeqTest.fs" Condition="'$(FableCompile)' != 'true'" />
     <Compile Include="TimeshiftTest.fs" />
     <Compile Include="ActorInteropTest.fs" />
@@ -31,6 +32,7 @@
   <ItemGroup>
     <ProjectReference Include="../src/Fable.Reactive.fsproj" />
   </ItemGroup>
+  <!-- invariant: FableCompile excludes both the AsyncSeq tests and their .NET-only project reference -->
   <ItemGroup Condition="'$(FableCompile)' != 'true'">
     <ProjectReference Include="../extra/AsyncSeq/Fable.Reactive.AsyncSeq.fsproj" />
   </ItemGroup>

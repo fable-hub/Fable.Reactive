@@ -12,6 +12,9 @@ module internal Subjects =
 
     /// A cold stream that only supports a single subscriber.
     /// Notifications arriving before subscription are buffered and replayed.
+    ///
+    /// decision: buffers before subscription because producer and subscriber startup order differs across targets
+    /// invariant: buffered notifications replay in arrival order before live forwarding begins
     let singleSubject<'TSource> () : IAsyncObserver<'TSource> * IAsyncObservable<'TSource> =
         let actor =
             Actor.spawn (fun inbox ->

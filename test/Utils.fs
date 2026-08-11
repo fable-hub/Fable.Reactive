@@ -11,6 +11,8 @@ open Fable.Reactive
 /// Nib assertion: the list contains every element of `expected`, order-insensitive.
 /// Nib's own `haveSameElements` sorts, which `Notification<'a>` cannot do — `OnError of exn`
 /// leaves the type without a comparison constraint — so equality-only containment it is.
+///
+/// decision: checks equality-only containment because Notification cannot satisfy Nib's sorting constraint
 let containAll (expected: 'a list) : Assertion<'a list> =
     assertion
         (fun xs ->
@@ -68,6 +70,10 @@ type ITestObserver<'a> =
 ///
 /// `Await`/`AwaitIgnore`/`Refresh` fetch a snapshot and cache it locally, so the
 /// `Notifications` property returns the state as of the last such call.
+///
+/// decision: owns mutable test state in one actor because BEAM processes cannot observe each other's mutations
+/// decision: returns an object expression because Fable BEAM cannot read class fields from interface implementations
+/// invariant: Notifications exposes only the snapshot captured by the latest Await, AwaitIgnore, Refresh, or WaitUntil
 let TestObserver<'a> () : ITestObserver<'a> =
     let store =
         Actor.spawn (fun inbox ->
@@ -136,6 +142,8 @@ let TestObserver<'a> () : ITestObserver<'a> =
         /// cache as it goes. Prefer this over `Async.Sleep n` for "wait until the value
         /// shows up": a loaded CI runner can starve a timer past any fixed margin, and
         /// Quill's own timeout is what fails the test if the value never arrives.
+        ///
+        /// decision: polls observable state instead of relying on a fixed scheduling margin
         member _.WaitUntil(predicate) =
             let rec loop () =
                 async {
@@ -174,6 +182,8 @@ let TestObserver<'a> () : ITestObserver<'a> =
 
 /// Poll until the predicate holds. Cross-target: no Task or blocking primitives,
 /// only `Async.Sleep`, which every Fable target implements.
+///
+/// decision: uses Async.Sleep polling because it compiles and yields on every supported target
 let waitUntil (predicate: unit -> bool) : Async<unit> =
     let rec loop () =
         async {

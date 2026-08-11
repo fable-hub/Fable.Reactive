@@ -23,6 +23,10 @@ module internal Combine =
         (maxConcurrent: int)
         (source: IAsyncObservable<IAsyncObservable<'TSource>>)
         : IAsyncObservable<'TSource> =
+        // decision: uses one actor to serialize inner-stream admission and completion
+        // invariant: maxConcurrent > 0 bounds active inner subscriptions; zero permits unbounded concurrency
+        // invariant: outer completion reaches downstream only after every admitted or queued inner stream completes
+        // tradeoff: constrained concurrency uses an unbounded FIFO queue when arrivals outpace completions
         let subscribeAsync (aobv: IAsyncObserver<'TSource>) =
             let safeObv, autoDetach = autoDetachObserver aobv
 

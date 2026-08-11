@@ -45,6 +45,9 @@ module Reactive =
 
     /// Convert async observable to async sequence, non-blocking. Producer will be awaited until item is consumed by the
     /// async enumerator.
+    ///
+    /// decision: uses a ping-pong handshake to provide one-item backpressure without a shared blocking queue
+    /// invariant: the producer cannot overwrite the pending notification before the consumer acknowledges it
     let toAsyncSeq (source: IAsyncObservable<'TSource>) : AsyncSeq<'TSource> =
         let ping = new AutoResetEvent false
         let pong = new AutoResetEvent false

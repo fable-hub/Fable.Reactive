@@ -28,6 +28,10 @@ module internal ActorInterop =
     ///   Escalate → forward as OnErrorAsync (terminates the stream)
     ///   Stop     → actor dies, stream continues (crashed item is lost)
     ///   Restart  → actor is restarted, stream continues (crashed item is lost)
+    ///
+    /// decision: routes values and linked exits through one monitor so restart never exposes a stale child actor
+    /// invariant: terminal source notifications bypass the child and retain control of the stream lifecycle
+    /// tradeoff: Stop and Restart keep the stream alive by dropping the item that crashed the child
     let flatMapActorSupervised
         (decide: exn -> Directive)
         (handler: ('TResult -> unit) -> Actor<'TSource> -> ActorOp<unit>)
@@ -41,9 +45,8 @@ module internal ActorInterop =
                 let emit value =
                     dispatch.OnNextAsync value |> Async.Start'
 
-                // Terminating downstream must never itself throw: nothing supervises the
-                // monitor, so an exception escaping here would kill it silently — the very
-                // failure this is here to report.
+                // Nothing supervises the monitor, so downstream termination must not throw back into it.
+                // invariant: escalation attempts one terminal notification and never raises into the monitor
                 let escalate (ex: exn) =
                     async {
                         try
@@ -52,18 +55,15 @@ module internal ActorInterop =
                             ()
                     }
 
-                // Monitor actor: spawns and supervises the child, swaps it on
-                // Restart, and forwards upstream values to it. Routing values
-                // through the monitor means the child is always set before the
-                // first value is dequeued, so no external readiness handshake is
-                // needed — and upstream can never post to a stale child during a
-                // restart. The monitor is Actor<obj>, carrying both ChildExited
-                // signals and forwarded 'TSource values.
+                // Spawns and supervises the child, replaces it on Restart, and forwards upstream values.
+                //
+                // decision: multiplexes ChildExited and source values through Actor<obj> to serialize routing
+                // invariant: the current child is installed before the monitor dequeues an upstream value
+                // tradeoff: runtime casts buy one ordered mailbox for control signals and typed source values
                 let monitor =
                     Actor.spawn (fun inbox ->
-                        // Required on BEAM, where spawnLinked is a bare spawn_link: without exit
-                        // trapping a child crash kills the monitor instead of arriving as a
-                        // ChildExited message, so no directive would ever run. No-op elsewhere.
+                        // BEAM implements spawnLinked with spawn_link; trapping converts a child crash into a message.
+                        // decision: traps linked exits so the monitor, rather than the runtime, applies the decider
                         Actor.trapExits ()
 
                         let mutable child = Actor.spawnLinked inbox (handler emit)
@@ -72,12 +72,9 @@ module internal ActorInterop =
                             actor {
                                 let! msg = inbox.Receive()
 
-                                // The monitor is the top of this supervision tree — nothing
-                                // watches it in turn. Left bare, a throw from the user's `decide`,
-                                // from `OnErrorAsync`, or from the cast would kill the loop and
-                                // leave the subscription hanging with no terminal notification:
-                                // upstream keeps posting into a mailbox nobody reads. Report the
-                                // failure downstream and stop instead.
+                                // The monitor is the root of this local supervision tree.
+                                // decision: catches loop failures so an unsupervised monitor terminates downstream
+                                // invariant: monitor failure escalates and stops instead of leaving an unread mailbox
                                 let! alive =
                                     actor {
                                         try
@@ -92,12 +89,8 @@ module internal ActorInterop =
                                                 | Directive.Escalate -> do! escalate ex
                                                 | Directive.Stop -> ()
                                                 | Directive.Restart -> child <- Actor.spawnLinked inbox (handler emit)
-                                            // Anything that is not a ChildExited is an upstream
-                                            // value: both backends deliver exits pre-converted
-                                            // (BEAM's receive_msg turns trapped EXIT signals into
-                                            // ChildExited and drops `normal` ones, .NET's
-                                            // spawnLinked posts one from its crash handler), so
-                                            // nothing else can reach this mailbox.
+                                            // Both backends normalize linked exits to ChildExited before this point.
+                                            // assumption: every other mailbox item is a boxed TSource value
                                             | None -> child.Post(unbox<'TSource> msg)
 
                                             return true
@@ -142,6 +135,8 @@ module internal ActorInterop =
 
     /// Stateful 1-to-1 transform using an actor with request-reply (call).
     /// Provides backpressure — the pipeline waits for the actor's reply before emitting downstream.
+    ///
+    /// decision: uses request-reply so actor processing applies backpressure to each upstream notification
     let mapActor
         (handler: 'State -> 'TSource -> 'State * 'TResult)
         (initialState: 'State)
@@ -182,6 +177,10 @@ module internal ActorInterop =
 
     /// Create an actor-backed subject. The actor body receives an emit callback.
     /// Returns the actor (for posting messages) and an observable (for subscribing).
+    /// The observable is hot; values emitted before subscription are not replayed.
+    ///
+    /// decision: spawns the actor eagerly and multicasts its output so subscribers share one actor lifecycle
+    /// tradeoff: emissions before the first subscription can be lost because the backing subject has no replay buffer
     let ofActor (body: ('T -> unit) -> Actor<'Msg> -> ActorOp<unit>) : Actor<'Msg> * IAsyncObservable<'T> =
         let dispatch, stream = Subjects.subject<'T> ()
 

@@ -17,7 +17,7 @@ module internal Tap =
                     { new IAsyncObserver<'TSource> with
                         member this.OnNextAsync x =
                             async {
-                                // Let exceptions bubble to the top
+                                // decision: propagates tap failures so stream safety can convert them to errors
                                 do! onNextAsync x
                                 do! obvAsync.OnNextAsync x
                             }
