@@ -19,7 +19,10 @@ module internal Create =
         { new IAsyncObservable<'TSource> with
             member _.SubscribeAsync o = subscribe o }
 
-    // Create async observable from async worker function
+    // Creates a cold observable from an asynchronous worker.
+    //
+    // decision: starts a distinct cancellable worker for each subscription so subscribers never share execution
+    // assumption: workers cooperate with async cancellation — disposal cannot force blocking foreign code
     let ofAsyncWorker
         (worker: IAsyncObserver<'TSource> -> CancellationToken -> Async<unit>)
         : IAsyncObservable<'TSource> =

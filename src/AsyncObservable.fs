@@ -49,8 +49,9 @@ module Observable =
                         return disposable.ToAsyncDisposable()
                     } }
 
-/// A single module that contains all the operators. Nicer and shorter way than writing AsyncObservable. We want to
-/// prefix our operators so we don't mix e.g. `map` with other modules.
+/// Provides all async-observable operators through the qualified `Reactive` API.
+///
+/// decision: centralizes operators in a RequireQualifiedAccess module to avoid collisions with common F# function names
 [<RequireQualifiedAccess>]
 module Reactive =
 

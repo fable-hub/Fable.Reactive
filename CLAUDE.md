@@ -6,6 +6,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Fable.Reactive is a lightweight Async Reactive library for F# implementing Async Observables (ReactiveX pattern). Designed for Fable compatibility, enabling the same F# code to run both server-side and transpiled to JavaScript.
 
+## Repository Instructions
+
+Read and follow `AGENTS.md` for repository-wide contributor and agent
+instructions, including the locally adopted Agent Decision Comments convention.
+
 ## Build Commands
 
 Use `just` as the task runner (see `justfile` for all recipes):

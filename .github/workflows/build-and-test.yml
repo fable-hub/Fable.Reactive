@@ -38,6 +38,8 @@ jobs:
   #
   # Nothing is executed, only compiled, so no Node, uv, rebar3 or erl is needed.
   # fail-fast is off so one broken target does not mask the state of the others.
+  # decision: gates Fable compilation while known runtime gaps keep cross-target execution non-gating
+  # tradeoff: compilation catches portability errors but cannot detect target-specific runtime regressions
   fable-compile:
 
     runs-on: ubuntu-latest

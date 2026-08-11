@@ -12,6 +12,10 @@ open type Scriptorium.Quill.Runner
 //
 // This is a timing-heavy suite (timers, debounce, subjects), so the "slow test" threshold is
 // raised from Quill's 300ms default — several tests sleep on purpose and are not slow at all.
+//
+// decision: uses one Quill entry point so every target executes the same registered test lists
+// assumption: Quill owns platform-specific process termination and propagates failures through the process exit code
+// decision: raises the slow threshold to distinguish intentional timer waits from unexpectedly slow tests
 [<EntryPoint>]
 let main _argv =
     runTestsWith (

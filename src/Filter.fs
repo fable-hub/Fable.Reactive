@@ -180,6 +180,9 @@ module internal Filter =
             member _.SubscribeAsync o = subscribeAsync o }
 
     /// Returns the values from the source observable sequence until the other observable sequence produces a value.
+    ///
+    /// decision: subscribes to the stopping observable first so an eager stop signal cannot be missed
+    /// invariant: source values arriving after the first stopping OnNext are suppressed by the safe observer
     let takeUntil
         (other: IAsyncObservable<'TResult>)
         (source: IAsyncObservable<'TSource>)

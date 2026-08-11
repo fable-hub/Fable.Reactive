@@ -12,6 +12,9 @@ module internal Timeshift =
 
     /// Time shifts the observable sequence by the given timeout. The
     /// relative time intervals between the values are preserved.
+    ///
+    /// decision: queues delayed notifications through one actor to preserve source and terminal ordering
+    /// invariant: a terminal notification never overtakes an earlier delayed value
     let delay (msecs: int) (source: IAsyncObservable<'TSource>) : IAsyncObservable<'TSource> =
         let subscribeAsync (aobv: IAsyncObserver<'TSource>) =
             let agent =
@@ -59,6 +62,9 @@ module internal Timeshift =
 
     /// Ignores values from an observable sequence which are followed by
     /// another value before the given timeout.
+    ///
+    /// decision: uses monotonic generations instead of replacing timers to behave uniformly across Fable targets
+    /// invariant: only the latest OnNext generation emits after the quiet period
     let debounce (msecs: int) (source: IAsyncObservable<'TSource>) : IAsyncObservable<'TSource> =
         let subscribeAsync (aobv: IAsyncObserver<'TSource>) =
             let safeObv, autoDetach = autoDetachObserver aobv

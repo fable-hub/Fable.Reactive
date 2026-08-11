@@ -80,6 +80,10 @@ module internal Transform =
 
     /// Transforms an observable sequence of observable sequences into an observable sequence producing values only from
     /// the most recent observable sequence.
+    ///
+    /// decision: owns the current inner subscription in one actor so switching and completion cannot race
+    /// invariant: each new inner subscribes only after the previous inner subscription is disposed
+    /// invariant: outer completion waits for the current inner stream to complete
     let switchLatest (source: IAsyncObservable<IAsyncObservable<'TSource>>) : IAsyncObservable<'TSource> =
         let subscribeAsync (aobv: IAsyncObserver<'TSource>) =
             let safeObv, autoDetach = autoDetachObserver aobv

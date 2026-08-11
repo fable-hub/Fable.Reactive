@@ -92,6 +92,9 @@ module internal Aggregation =
 
     /// Groups the elements of an observable sequence according to a specified key mapper function. Returns a sequence
     /// of observable groups, each of which corresponds to a given key.
+    ///
+    /// decision: uses single subjects so a group's first value waits until the outer observer receives the group
+    /// invariant: the outer observer receives each new group before that group receives its first source value
     let groupBy
         (keyMapper: 'TSource -> 'TKey)
         (source: IAsyncObservable<'TSource>)

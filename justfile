@@ -56,11 +56,14 @@ shipit *args:
 
 # One suite in test/, compiled to each target from the same project. Assertions come from
 # Scriptorium.Nib, the runner from Scriptorium.Quill.
+# decision: compiles one shared suite for every target so behavioral coverage cannot drift between harnesses
 #
 # FableCompile=true drops the .NET-only bits (extra/AsyncSeq + AsyncSeqTest.fs, which need
 # FSharp.Control.AsyncSeq and AutoResetEvent) from the Fable builds. It reaches the design-time
 # build Fable runs internally because MSBuild treats environment variables as global properties
 # — Fable has no flag to forward one.
+# decision: passes FableCompile through the environment because Fable cannot forward an MSBuild property itself
+# invariant: FableCompile excludes every test and project reference that depends on .NET-only primitives
 #
 # Current pass rates: .NET 86/86, JS 82/84, Python 79/84, BEAM 14/84.
 # The Fable-target failures are all pre-existing library gaps this suite is the first to reach,

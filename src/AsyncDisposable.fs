@@ -5,7 +5,9 @@ open System.Threading
 
 open Fable.Reactive.Core
 
-/// Overloads and extensions for AsyncDisposable
+/// Creates asynchronous disposables whose cancellation callback runs at most once.
+///
+/// invariant: each AsyncDisposable instance invokes its cancellation callback no more than once
 type AsyncDisposable private (cancel) =
     let mutable isDisposed = 0
 
@@ -39,6 +41,7 @@ type AsyncDisposable private (cancel) =
         AsyncDisposable cancel :> IReactiveDisposable
 
 type Disposable(cancel) =
+    // invariant: each Disposable instance invokes its cancellation callback no more than once
     let mutable isDisposed = 0
 
     interface IDisposable with

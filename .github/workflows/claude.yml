@@ -21,6 +21,7 @@ jobs:
 
     # Only trigger on @claude mentions from trusted contributors
     # (NONE = first-time contributors with no prior contributions)
+    # decision: rejects first-time contributors to keep untrusted prompts out of the privileged agent workflow
     if: |
       (
         (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
