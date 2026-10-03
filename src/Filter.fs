@@ -184,9 +184,12 @@ module internal Filter =
         }
 
     /// Returns the values from the source observable sequence until the other observable sequence produces a value.
+    /// Source values racing the notifier may be dropped; producer-side ordering across the two subscriptions
+    /// does not guarantee downstream delivery order.
     ///
     /// decision: subscribes to the stopping observable first so an eager stop signal cannot be missed
-    /// invariant: source values arriving after the first stopping OnNext are suppressed by the safe observer
+    /// decision: retains independent source and notifier delivery rather than imposing cross-source ordering
+    /// invariant: the safe observer suppresses source notifications dequeued after its terminal notification
     let takeUntil
         (other: IAsyncObservable<'TResult>)
         (source: IAsyncObservable<'TSource>)
