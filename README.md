@@ -47,6 +47,9 @@ All sub-namespaces and modules have been renamed accordingly:
 
 Documentation is currently being updated.
 
+See [Interoperability with .NET Reactive Extensions](docs/INTEROPERABILITY.md) for existing
+observable, observer, and subscription adapters and their asynchronous execution boundaries.
+
 ## Install
 
 ```cmd
