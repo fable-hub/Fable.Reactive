@@ -1,11 +1,19 @@
 ---
-last_commit_released: 2c3fbd69bae145838ea11fbed96b097fdaa31336
+last_commit_released: d408672d9b636b629a9cacc1a7eeb8d09de5c9ec
 name: Fable.Reactive
 ---
 
 # Changelog
 
 All notable changes to this project will be documented in this file.
+
+## 1.0.0-rc.8 - 2026-10-03
+
+### 🐞 Bug Fixes
+
+* *(beam)* Keep debounce state actor-owned (#39) ([d408672](https://github.com/fable-hub/Fable.Reactive/commit/d408672d9b636b629a9cacc1a7eeb8d09de5c9ec))
+
+<strong><small>[View changes on Github](https://github.com/fable-hub/Fable.Reactive/compare/2c3fbd69bae145838ea11fbed96b097fdaa31336..d408672d9b636b629a9cacc1a7eeb8d09de5c9ec)</small></strong>
 
 ## 1.0.0-rc.7 - 2026-08-01
 
