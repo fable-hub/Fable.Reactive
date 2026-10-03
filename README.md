@@ -47,6 +47,14 @@ All sub-namespaces and modules have been renamed accordingly:
 
 Documentation is currently being updated.
 
+### takeUntil ordering
+
+`Reactive.takeUntil notifier source` stops forwarding source values when it observes a notifier value.
+The two subscriptions deliver independently, so source values still in flight may be dropped when the
+notifier stops the stream. Posting source values before a notifier value, even with sequential
+`do! sourceObserver.OnNextAsync ...` calls, does not guarantee that downstream has received them.
+When that ordering matters, arrange downstream acknowledgement before triggering the notifier.
+
 ## Install
 
 ```cmd

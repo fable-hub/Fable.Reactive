@@ -209,6 +209,9 @@ module Reactive =
     let takeLast (count: int) (source: IAsyncObservable<'a>) : IAsyncObservable<'a> = Filter.takeLast count source
 
     /// Returns the values from the source observable sequence until the other observable sequence produces a value.
+    /// Source and notifier delivery are independent: source values still in flight when the notifier is observed
+    /// may be dropped. Posting or awaiting source notifications before posting the notifier does not guarantee
+    /// that those source values reach the downstream observer first.
     let takeUntil (other: IAsyncObservable<'b>) (source: IAsyncObservable<'a>) : IAsyncObservable<'a> =
         Filter.takeUntil other source
 
