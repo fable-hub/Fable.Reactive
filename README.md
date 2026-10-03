@@ -50,7 +50,18 @@ Documentation is currently being updated.
 See [Interoperability with .NET Reactive Extensions](docs/INTEROPERABILITY.md) for existing
 observable, observer, and subscription adapters and their asynchronous execution boundaries.
 
+### takeUntil ordering
+
+`Reactive.takeUntil notifier source` stops forwarding source values when it observes a notifier value.
+The two subscriptions deliver independently, so source values still in flight may be dropped when the
+notifier stops the stream. Posting source values before a notifier value, even with sequential
+`do! sourceObserver.OnNextAsync ...` calls, does not guarantee that downstream has received them.
+When that ordering matters, arrange downstream acknowledgement before triggering the notifier.
+
 ## Install
+
+When compiling for JavaScript, Python, or BEAM, use Fable 5.22.0 or newer.
+This compiler requirement does not apply to .NET-only applications.
 
 ```cmd
 dotnet paket add Fable.Reactive --project <project>
