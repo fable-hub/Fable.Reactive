@@ -47,7 +47,8 @@ module Observable =
                         let obv = aobv.ToObserver()
                         let disposable = this.Subscribe obv
                         return disposable.ToAsyncDisposable()
-                    } }
+                    }
+            }
 
 /// Provides all async-observable operators through the qualified `Reactive` API.
 ///
@@ -146,10 +147,10 @@ module Reactive =
     let defer (factory: unit -> IAsyncObservable<'a>) : IAsyncObservable<'a> = Create.defer factory
 
     /// Returns an observable sequence with no elements.
-    let empty<'a> () : IAsyncObservable<'a> = Create.empty<'a> ()
+    let empty<'a> () : IAsyncObservable<'a> = Create.empty<'a>()
 
     /// Returns an empty observable sequence that never completes.
-    let never<'a> () : IAsyncObservable<'a> = Create.never<'a> ()
+    let never<'a> () : IAsyncObservable<'a> = Create.never<'a>()
 
     /// Returns the observable sequence that terminates exceptionally with the specified exception.
     let fail<'a> (error: exn) : IAsyncObservable<'a> = Create.fail<'a> error
@@ -315,13 +316,13 @@ module Reactive =
 
     /// A subject is both an observable sequence as well as an observer. Each notification is broadcasted to all
     /// subscribed observers.
-    let subject<'a> () : IAsyncObserver<'a> * IAsyncObservable<'a> = Subjects.subject<'a> ()
+    let subject<'a> () : IAsyncObserver<'a> * IAsyncObservable<'a> = Subjects.subject<'a>()
 
     /// A mailbox subject is a subscribable mailbox. Each message is broadcasted to all subscribed observers.
-    let mbSubject<'a> () : Actor<Notification<'a>> * IAsyncObservable<'a> = Subjects.mbSubject<'a> ()
+    let mbSubject<'a> () : Actor<Notification<'a>> * IAsyncObservable<'a> = Subjects.mbSubject<'a>()
 
     /// A cold subject that only supports a single subscriber. Will await the caller if no-one is subscribing.
-    let singleSubject<'a> () : IAsyncObserver<'a> * IAsyncObservable<'a> = Subjects.singleSubject<'a> ()
+    let singleSubject<'a> () : IAsyncObserver<'a> * IAsyncObservable<'a> = Subjects.singleSubject<'a>()
 
     // Tap Region
 

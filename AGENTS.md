@@ -28,6 +28,7 @@ Use the `justfile` as the task interface:
 - `just test-js`, `just test-python`, and `just test-beam` transpile and run the same suite on other targets. Some cross-target failures are currently documented in `CLAUDE.md`.
 - `just test-all` performs the full cross-target sweep.
 - `just format` formats `src/` and `test/` with Fantomas.
+- `just format-check` checks formatting without modifying files; CI runs the same check.
 - `just pack` creates both NuGet packages in `nupkgs/`.
 
 ## Coding Style & Naming Conventions

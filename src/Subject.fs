@@ -70,7 +70,8 @@ module internal Subjects =
 
         let obs =
             { new IAsyncObservable<'TSource> with
-                member __.SubscribeAsync o = subscribeAsync o }
+                member __.SubscribeAsync o = subscribeAsync o
+            }
 
         AsyncObserver obv :> IAsyncObserver<'TSource>, obs
 
@@ -113,17 +114,19 @@ module internal Subjects =
 
         mb,
         { new IAsyncObservable<'TSource> with
-            member __.SubscribeAsync o = subscribeAsync o }
+            member __.SubscribeAsync o = subscribeAsync o
+        }
 
     /// A stream is both an observable sequence as well as an observer.
     /// Each notification is broadcasted to all subscribed observers.
     let subject<'TSource> () : IAsyncObserver<'TSource> * IAsyncObservable<'TSource> =
-        let actor, obs = mbSubject<'TSource> ()
+        let actor, obs = mbSubject<'TSource>()
 
         let obv =
             { new IAsyncObserver<'TSource> with
                 member this.OnNextAsync x = async { OnNext x |> actor.Post }
                 member this.OnErrorAsync err = async { OnError err |> actor.Post }
-                member this.OnCompletedAsync() = async { OnCompleted |> actor.Post } }
+                member this.OnCompletedAsync() = async { OnCompleted |> actor.Post }
+            }
 
         obv, obs

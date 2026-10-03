@@ -21,6 +21,8 @@ jobs:
         dotnet-quality: preview
     - name: Setup paket
       run: dotnet tool restore
+    - name: Check formatting
+      run: dotnet fantomas src test --check
     - name: Install dependencies
       run: dotnet restore
     - name: Build
@@ -56,7 +58,7 @@ jobs:
       with:
         dotnet-version: 10.0.x
         dotnet-quality: preview
-    # Pulls the `fable` tool pinned in .config/dotnet-tools.json (5.13.0).
+    # Pulls the `fable` tool pinned in .config/dotnet-tools.json.
     - name: Setup paket
       run: dotnet tool restore
     - name: Install dependencies

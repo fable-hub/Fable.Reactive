@@ -20,24 +20,26 @@ open type Scriptorium.Quill.Runner
 let main _argv =
     runTestsWith (
         slowThreshold 1000,
-        [ Tests.GroupBy.tests
-          Tests.Observer.tests
-          Tests.Create.tests
-          Tests.Filter.tests
-          Tests.Map.tests
-          Tests.Merge.tests
-          Tests.Concat.tests
-          Tests.Bind.tests
-          Tests.Query.tests
-          Tests.Catch.tests
-          Tests.Scan.tests
-          Tests.SubjectTest.tests
-          Tests.TakeUntil.tests
+        [
+            Tests.GroupBy.tests
+            Tests.Observer.tests
+            Tests.Create.tests
+            Tests.Filter.tests
+            Tests.Map.tests
+            Tests.Merge.tests
+            Tests.Concat.tests
+            Tests.Bind.tests
+            Tests.Query.tests
+            Tests.Catch.tests
+            Tests.Scan.tests
+            Tests.SubjectTest.tests
+            Tests.TakeUntil.tests
 #if !FABLE_COMPILER
-          Tests.AsyncSeq.tests
+            Tests.AsyncSeq.tests
 #endif
-          Tests.Timeshift.tests
-          Tests.Debounce.tests
-          Tests.ActorInterop.tests
-          Tests.Probe.tests ]
+            Tests.Timeshift.tests
+            Tests.Debounce.tests
+            Tests.ActorInterop.tests
+            Tests.Probe.tests
+        ]
     )

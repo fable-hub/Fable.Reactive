@@ -12,48 +12,50 @@ open Fable.Reactive
 let tests =
     testList (
         "AsyncSeq",
-        [ testAsync (
-              "observable to async seq",
-              async {
-                  // Arrange
-                  let xs =
-                      seq { 1..5 }
-                      |> Reactive.ofSeq
-                      |> Reactive.toAsyncSeq
+        [
+            testAsync (
+                "observable to async seq",
+                async {
+                    // Arrange
+                    let xs =
+                        seq { 1..5 }
+                        |> Reactive.ofSeq
+                        |> Reactive.toAsyncSeq
 
-                  let result = List<int>()
+                    let result = List<int>()
 
-                  let each x = async { result.Add x }
+                    let each x = async { result.Add x }
 
-                  // Act
-                  do! xs |> AsyncSeq.iterAsync each
+                    // Act
+                    do! xs |> AsyncSeq.iterAsync each
 
-                  // Assert
-                  let actual = result |> List.ofSeq
-                  assertThat actual (isEqualTo [ 1..5 ])
-              }
-          )
+                    // Assert
+                    let actual = result |> List.ofSeq
+                    assertThat actual (isEqualTo [ 1..5 ])
+                }
+            )
 
-          testAsync (
-              "seq to async seq to observable to async seq",
-              async {
-                  // Arrange
-                  let xs =
-                      seq { 1..5 }
-                      |> AsyncSeq.ofSeq
-                      |> Reactive.ofAsyncSeq
-                      |> Reactive.toAsyncSeq
+            testAsync (
+                "seq to async seq to observable to async seq",
+                async {
+                    // Arrange
+                    let xs =
+                        seq { 1..5 }
+                        |> AsyncSeq.ofSeq
+                        |> Reactive.ofAsyncSeq
+                        |> Reactive.toAsyncSeq
 
-                  let result = List<int>()
+                    let result = List<int>()
 
-                  let each x = async { result.Add x }
+                    let each x = async { result.Add x }
 
-                  // Act
-                  do! xs |> AsyncSeq.iterAsync each
+                    // Act
+                    do! xs |> AsyncSeq.iterAsync each
 
-                  // Assert
-                  let actual = result |> List.ofSeq
-                  assertThat actual (isEqualTo [ 1..5 ])
-              }
-          ) ]
+                    // Assert
+                    let actual = result |> List.ofSeq
+                    assertThat actual (isEqualTo [ 1..5 ])
+                }
+            )
+        ]
     )

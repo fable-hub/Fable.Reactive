@@ -62,7 +62,8 @@ module internal Timeshift =
             }
 
         { new IAsyncObservable<'TSource> with
-            member _.SubscribeAsync o = subscribeAsync o }
+            member _.SubscribeAsync o = subscribeAsync o
+        }
 
     /// Ignores values from an observable sequence which are followed by
     /// another value before the given timeout.
@@ -134,7 +135,8 @@ module internal Timeshift =
             }
 
         { new IAsyncObservable<'TSource> with
-            member _.SubscribeAsync o = subscribeAsync o }
+            member _.SubscribeAsync o = subscribeAsync o
+        }
 
     /// Samples the observable sequence at each interval.
     let sample msecs (source: IAsyncObservable<'TSource>) : IAsyncObservable<'TSource> =

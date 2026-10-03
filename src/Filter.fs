@@ -86,7 +86,8 @@ module internal Filter =
             }
 
         { new IAsyncObservable<'TSource> with
-            member _.SubscribeAsync o = subscribeAsync o }
+            member _.SubscribeAsync o = subscribeAsync o
+        }
 
     /// Bypasses a specified number of elements in an observable sequence and then returns the remaining elements.
     let skip (count: int) (source: IAsyncObservable<'TSource>) : IAsyncObservable<'TSource> =
@@ -115,7 +116,8 @@ module internal Filter =
             }
 
         { new IAsyncObservable<'TSource> with
-            member _.SubscribeAsync o = subscribeAsync o }
+            member _.SubscribeAsync o = subscribeAsync o
+        }
 
     /// Returns a specified number of contiguous elements from the start of an observable sequence.
     let take (count: int) (source: IAsyncObservable<'TSource>) : IAsyncObservable<'TSource> =
@@ -146,7 +148,8 @@ module internal Filter =
             }
 
         { new IAsyncObservable<'TSource> with
-            member _.SubscribeAsync o = subscribeAsync o }
+            member _.SubscribeAsync o = subscribeAsync o
+        }
 
     /// Returns a specified number of contiguous elements from the end of an observable sequence.
     let takeLast (count: int) (source: IAsyncObservable<'TSource>) : IAsyncObservable<'TSource> =
@@ -177,7 +180,8 @@ module internal Filter =
             }
 
         { new IAsyncObservable<'TSource> with
-            member _.SubscribeAsync o = subscribeAsync o }
+            member _.SubscribeAsync o = subscribeAsync o
+        }
 
     /// Returns the values from the source observable sequence until the other observable sequence produces a value.
     ///
@@ -204,4 +208,5 @@ module internal Filter =
             }
 
         { new IAsyncObservable<'TSource> with
-            member _.SubscribeAsync o = subscribeAsync o }
+            member _.SubscribeAsync o = subscribeAsync o
+        }

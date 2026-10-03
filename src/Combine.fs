@@ -7,10 +7,12 @@ module internal Combine =
     type Key = int
 
     type Model<'a> =
-        { Subscriptions: Map<Key, IReactiveDisposable>
-          Queue: IAsyncObservable<'a> list
-          IsStopped: bool
-          Key: Key }
+        {
+            Subscriptions: Map<Key, IReactiveDisposable>
+            Queue: IAsyncObservable<'a> list
+            IsStopped: bool
+            Key: Key
+        }
 
     [<RequireQualifiedAccess>]
     type private Msg<'a> =
@@ -31,10 +33,12 @@ module internal Combine =
             let safeObv, autoDetach = autoDetachObserver aobv
 
             let initialModel =
-                { Subscriptions = Map.empty
-                  Queue = []
-                  IsStopped = false
-                  Key = 0 }
+                {
+                    Subscriptions = Map.empty
+                    Queue = []
+                    IsStopped = false
+                    Key = 0
+                }
 
             let agent =
                 Actor.spawn (fun inbox ->
@@ -44,7 +48,8 @@ module internal Combine =
                             member _.OnErrorAsync err = safeObv.OnErrorAsync err
 
                             member _.OnCompletedAsync() =
-                                async { Msg.InnerCompleted key |> inbox.Post } }
+                                async { Msg.InnerCompleted key |> inbox.Post }
+                        }
 
                     let update msg model =
                         async {
@@ -59,11 +64,13 @@ module internal Combine =
                                     return
                                         { model with
                                             Subscriptions = model.Subscriptions.Add(model.Key, inner)
-                                            Key = model.Key + 1 }
+                                            Key = model.Key + 1
+                                        }
                                 else
                                     return
                                         { model with
-                                            Queue = List.append model.Queue [ xs ] }
+                                            Queue = List.append model.Queue [ xs ]
+                                        }
                             | Msg.InnerCompleted key ->
                                 let subscriptions = model.Subscriptions.Remove key
 
@@ -75,11 +82,13 @@ module internal Combine =
                                         { model with
                                             Subscriptions = subscriptions.Add(model.Key, inner)
                                             Key = model.Key + 1
-                                            Queue = List.tail model.Queue }
+                                            Queue = List.tail model.Queue
+                                        }
                                 else if subscriptions.Count > 0 then
                                     return
                                         { model with
-                                            Subscriptions = subscriptions }
+                                            Subscriptions = subscriptions
+                                        }
                                 else
                                     if model.IsStopped then
                                         do! safeObv.OnCompletedAsync()
@@ -119,7 +128,8 @@ module internal Combine =
                             }
 
                         member this.OnCompletedAsync() =
-                            async { Msg.OuterCompleted |> agent.Post } }
+                            async { Msg.OuterCompleted |> agent.Post }
+                    }
 
                 let! dispose = source.SubscribeAsync obv |> autoDetach
 
@@ -133,7 +143,8 @@ module internal Combine =
             }
 
         { new IAsyncObservable<'TSource> with
-            member _.SubscribeAsync o = subscribeAsync o }
+            member _.SubscribeAsync o = subscribeAsync o
+        }
 
     /// Returns an observable sequence that contains the elements of each given sequences, in sequential order.
     let concatSeq (sources: seq<IAsyncObservable<'TSource>>) : IAsyncObservable<'TSource> =
@@ -209,7 +220,8 @@ module internal Combine =
             }
 
         { new IAsyncObservable<'TSource * 'TOther> with
-            member _.SubscribeAsync o = subscribeAsync o }
+            member _.SubscribeAsync o = subscribeAsync o
+        }
 
     /// Merges the specified observable sequences into one observable sequence by combining the values into tuples only
     /// when the first observable sequence produces an element. Returns the combined observable sequence.
@@ -277,7 +289,8 @@ module internal Combine =
             }
 
         { new IAsyncObservable<'TSource * 'TOther> with
-            member _.SubscribeAsync o = subscribeAsync o }
+            member _.SubscribeAsync o = subscribeAsync o
+        }
 
     let zipSeq (sequence: seq<'TOther>) (source: IAsyncObservable<'TSource>) : IAsyncObservable<'TSource * 'TOther> =
         let subscribeAsync (aobv: IAsyncObserver<'TSource * 'TOther>) =
@@ -310,4 +323,5 @@ module internal Combine =
             }
 
         { new IAsyncObservable<'TSource * 'TOther> with
-            member _.SubscribeAsync o = subscribeAsync o }
+            member _.SubscribeAsync o = subscribeAsync o
+        }

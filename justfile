@@ -28,6 +28,10 @@ build-release:
 format:
     dotnet fantomas {{src_path}} {{test_path}}
 
+# Check source formatting without modifying files
+format-check:
+    dotnet fantomas {{src_path}} {{test_path}} --check
+
 # Restore dependencies and tools
 restore:
     dotnet tool restore
