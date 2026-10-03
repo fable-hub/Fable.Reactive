@@ -37,6 +37,7 @@ let main _argv =
           Tests.AsyncSeq.tests
 #endif
           Tests.Timeshift.tests
+          Tests.Debounce.tests
           Tests.ActorInterop.tests
           Tests.Probe.tests ]
     )
