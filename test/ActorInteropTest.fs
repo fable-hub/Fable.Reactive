@@ -209,6 +209,92 @@ let tests =
                 }
             )
 
+#if !FABLE_COMPILER
+            testAsync (
+                "flatMapActorSupervised routes values queued during restart to the new child in order",
+                async {
+                    use releaseRestart = new System.Threading.ManualResetEventSlim(false)
+
+                    let restarting =
+                        System.Threading.Tasks.TaskCompletionSource<unit>(
+                            System.Threading.Tasks.TaskCreationOptions.RunContinuationsAsynchronously
+                        )
+
+                    let handled = System.Collections.Concurrent.ConcurrentQueue<int>()
+                    let mutable upstream = Unchecked.defaultof<IAsyncObserver<int>>
+
+                    let source =
+                        Reactive.create (fun observer ->
+                            async {
+                                upstream <- observer
+                                return AsyncDisposable.Empty
+                            })
+
+                    // decision: holds the monitor in the decider so the burst queues behind the pending restart
+                    // invariant: values queued in the monitor during restart reach the replacement child in source order
+                    // tradeoff: uses a .NET blocking gate to arrange the race without scheduler-dependent sleeps
+                    let result =
+                        source
+                        |> Reactive.flatMapActorSupervised
+                            (fun _ ->
+                                restarting.SetResult()
+
+                                if not (releaseRestart.Wait(System.TimeSpan.FromSeconds 3.0)) then
+                                    failwith "restart gate was not released"
+
+                                Directive.Restart)
+                            (fun emit inbox ->
+                                let rec loop () =
+                                    actor {
+                                        let! value = inbox.Receive()
+
+                                        if value = 2 then
+                                            failwith "child crash"
+
+                                        handled.Enqueue value
+                                        emit (value * 10)
+                                        return! loop ()
+                                    }
+
+                                loop ())
+
+                    let observer = TestObserver<int>()
+                    let! subscription = result.SubscribeAsync observer
+
+                    try
+                        do! upstream.OnNextAsync 1
+                        do! observer.WaitUntil(List.exists isOnNext)
+                        do! upstream.OnNextAsync 2
+                        do! Async.AwaitTask restarting.Task
+
+                        for value in [ 3; 4; 5 ] do
+                            do! upstream.OnNextAsync value
+
+                        releaseRestart.Set()
+
+                        do!
+                            observer.WaitUntil(fun notifications ->
+                                List.filter isOnNext notifications |> List.length = 4)
+
+                        assertThat (handled.ToArray() |> Array.toList) (isEqualTo [ 1; 3; 4; 5 ])
+
+                        let values =
+                            observer.Notifications
+                            |> Seq.choose (function
+                                | OnNext value -> Some value
+                                | _ -> None)
+                            |> Seq.sort
+                            |> Seq.toList
+
+                        assertThat values (isEqualTo [ 10; 30; 40; 50 ])
+                        assertThat (observer.Notifications |> Seq.exists isOnError) isFalse
+                    finally
+                        releaseRestart.Set()
+                        subscription.DisposeAsync() |> Async.RunSynchronously
+                }
+            )
+#endif
+
             testAsync (
                 "flatMapActorSupervised escalates a throwing decider instead of hanging",
                 async {
