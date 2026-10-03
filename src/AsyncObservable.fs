@@ -56,6 +56,10 @@ module Observable =
 [<RequireQualifiedAccess>]
 module Reactive =
 
+    /// Subscribes an observer to the source sequence and returns its asynchronous subscription disposable.
+    let subscribeAsync (observer: IAsyncObserver<'a>) (source: IAsyncObservable<'a>) : Async<IReactiveDisposable> =
+        source.SubscribeAsync observer
+
     // Aggregate Region
 
     /// Groups the elements of an observable sequence according to a specified key mapper function. Returns a sequence

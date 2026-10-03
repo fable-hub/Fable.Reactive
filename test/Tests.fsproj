@@ -9,6 +9,7 @@
     <Compile Include="Utils.fs" />
     <Compile Include="GroupByTest.fs" />
     <Compile Include="ObserverTest.fs" />
+    <Compile Include="SubscribeTest.fs" />
     <Compile Include="CreateTest.fs" />
     <Compile Include="FilterTest.fs" />
     <Compile Include="MapTest.fs" />
