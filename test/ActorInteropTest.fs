@@ -213,13 +213,6 @@ let tests =
             testAsync (
                 "flatMapActorSupervised routes values queued during restart to the new child in order",
                 async {
-                    use releaseRestart = new System.Threading.ManualResetEventSlim(false)
-
-                    let restarting =
-                        System.Threading.Tasks.TaskCompletionSource<unit>(
-                            System.Threading.Tasks.TaskCreationOptions.RunContinuationsAsynchronously
-                        )
-
                     let handled = System.Collections.Concurrent.ConcurrentQueue<int>()
                     let mutable upstream = Unchecked.defaultof<IAsyncObserver<int>>
 
@@ -230,17 +223,16 @@ let tests =
                                 return AsyncDisposable.Empty
                             })
 
-                    // decision: holds the monitor in the decider so the burst queues behind the pending restart
+                    // decision: posts a burst from the decider to force enqueueing before the child is replaced
                     // invariant: values queued in the monitor during restart reach the replacement child in source order
-                    // tradeoff: uses a .NET blocking gate to arrange the race without scheduler-dependent sleeps
+                    // assumption: the captured upstream observer only posts, so these workflows complete synchronously
                     let result =
                         source
                         |> Reactive.flatMapActorSupervised
                             (fun _ ->
-                                restarting.SetResult()
-
-                                if not (releaseRestart.Wait(System.TimeSpan.FromSeconds 3.0)) then
-                                    failwith "restart gate was not released"
+                                for value in [ 3; 4; 5 ] do
+                                    upstream.OnNextAsync value
+                                    |> Async.RunSynchronously
 
                                 Directive.Restart)
                             (fun emit inbox ->
@@ -265,12 +257,6 @@ let tests =
                         do! upstream.OnNextAsync 1
                         do! observer.WaitUntil(List.exists isOnNext)
                         do! upstream.OnNextAsync 2
-                        do! Async.AwaitTask restarting.Task
-
-                        for value in [ 3; 4; 5 ] do
-                            do! upstream.OnNextAsync value
-
-                        releaseRestart.Set()
 
                         do!
                             observer.WaitUntil(fun notifications ->
@@ -289,8 +275,6 @@ let tests =
                         assertThat values (isEqualTo [ 10; 30; 40; 50 ])
                         assertThat (observer.Notifications |> Seq.exists isOnError) isFalse
                     finally
-                        releaseRestart.Set()
-
                         subscription.DisposeAsync()
                         |> Async.RunSynchronously
                 }
