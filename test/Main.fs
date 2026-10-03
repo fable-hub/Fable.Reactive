@@ -23,6 +23,7 @@ let main _argv =
         [
             Tests.GroupBy.tests
             Tests.Observer.tests
+            Tests.Subscribe.tests
             Tests.Create.tests
             Tests.Filter.tests
             Tests.Map.tests
