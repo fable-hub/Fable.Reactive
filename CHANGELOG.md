@@ -1,11 +1,19 @@
 ---
-last_commit_released: b449860886f32c90c4369842dd275bb0f80fded9
+last_commit_released: d8f8ba09173f1cb40587104c84cf4a9a8aef3f6e
 name: Fable.Reactive
 ---
 
 # Changelog
 
 All notable changes to this project will be documented in this file.
+
+## 1.0.0-rc.9 - 2026-10-03
+
+### 🚀 Features
+
+* Add pipe-friendly subscribeAsync (#42) ([2f317a7](https://github.com/fable-hub/Fable.Reactive/commit/2f317a7f03bf32e7f62c8c13dbeff4a981538f24))
+
+<strong><small>[View changes on Github](https://github.com/fable-hub/Fable.Reactive/compare/b449860886f32c90c4369842dd275bb0f80fded9..d8f8ba09173f1cb40587104c84cf4a9a8aef3f6e)</small></strong>
 
 ## 1.0.0-rc.8 - 2026-10-03
 
