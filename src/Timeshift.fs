@@ -1,7 +1,6 @@
 namespace Fable.Reactive
 
 open System
-open System.Threading
 open Fable.Actor
 
 open Fable.Reactive.Core
@@ -9,6 +8,11 @@ open Fable.Reactive.Core
 
 [<RequireQualifiedAccess>]
 module internal Timeshift =
+
+    type private DebounceMessage<'T> =
+        | Schedule of Notification<'T>
+        | Emit of value: 'T * generation: int
+        | Dispose
 
     /// Time shifts the observable sequence by the given timeout. The
     /// relative time intervals between the values are preserved.
@@ -63,62 +67,57 @@ module internal Timeshift =
     /// Ignores values from an observable sequence which are followed by
     /// another value before the given timeout.
     ///
-    /// decision: uses monotonic generations instead of replacing timers to behave uniformly across Fable targets
+    /// decision: assigns monotonic generations inside the actor so BEAM processes never share a mutable enumerator
+    /// decision: owns generation-tagged Fable.Actor timers to keep scheduling and disposal portable across targets
     /// invariant: only the latest OnNext generation emits after the quiet period
     let debounce (msecs: int) (source: IAsyncObservable<'TSource>) : IAsyncObservable<'TSource> =
         let subscribeAsync (aobv: IAsyncObserver<'TSource>) =
             let safeObv, autoDetach = autoDetachObserver aobv
-            let infinite = Seq.initInfinite id
-            let cts = new CancellationTokenSource()
+
+            let cancelTimers timers =
+                timers
+                |> Map.iter (fun _ timer -> Actor.cancelTimer timer)
 
             let agent =
                 Actor.spawn (fun inbox ->
-                    let rec messageLoop currentIndex =
+                    let rec messageLoop currentIndex timers stopped =
                         actor {
-                            let! n, index = inbox.Receive()
+                            let! message = inbox.Receive()
 
-                            let! newIndex =
-                                async {
-                                    match n, index with
-                                    | OnNext x, idx when idx = currentIndex ->
-                                        do! safeObv.OnNextAsync x
-                                        return index
-                                    | OnNext _, _ ->
-                                        if index > currentIndex then
-                                            return index
-                                        else
-                                            return currentIndex
-                                    | OnError ex, _ ->
-                                        do! safeObv.OnErrorAsync ex
-                                        return currentIndex
-                                    | OnCompleted, _ ->
-                                        do! safeObv.OnCompletedAsync()
-                                        return currentIndex
+                            match message with
+                            | Schedule _ when stopped -> return! messageLoop currentIndex timers stopped
+                            | Schedule notification ->
+                                let generation = currentIndex + 1
 
-                                }
+                                match notification with
+                                | OnNext value ->
+                                    let timer = Actor.schedule msecs (fun () -> inbox.Post(Emit(value, generation)))
 
-                            return! messageLoop newIndex
+                                    return! messageLoop generation (Map.add generation timer timers) false
+                                | OnError ex ->
+                                    cancelTimers timers
+                                    do! safeObv.OnErrorAsync ex
+                                    return! messageLoop generation Map.empty true
+                                | OnCompleted ->
+                                    cancelTimers timers
+                                    do! safeObv.OnCompletedAsync()
+                                    return! messageLoop generation Map.empty true
+                            | Emit(value, generation) ->
+                                let remaining = Map.remove generation timers
+
+                                if not stopped && generation = currentIndex then
+                                    do! safeObv.OnNextAsync value
+
+                                return! messageLoop currentIndex remaining stopped
+                            | Dispose ->
+                                cancelTimers timers
+                                return! messageLoop currentIndex Map.empty true
                         }
 
-                    messageLoop -1)
+                    messageLoop -1 Map.empty false)
 
             async {
-                let indexer = infinite.GetEnumerator()
-
-                let obv (n: Notification<'TSource>) =
-                    async {
-                        indexer.MoveNext() |> ignore
-                        let index = indexer.Current
-                        agent.Post(n, index)
-
-                        let worker =
-                            async {
-                                do! Async.Sleep msecs
-                                agent.Post(n, index)
-                            }
-
-                        Async.Start'(worker, cts.Token)
-                    }
+                let obv (n: Notification<'TSource>) = async { agent.Post(Schedule n) }
 
                 let! dispose =
                     AsyncObserver obv
@@ -127,7 +126,7 @@ module internal Timeshift =
 
                 let cancel () =
                     async {
-                        cts.Cancel()
+                        agent.Post Dispose
                         do! dispose.DisposeAsync()
                     }
 

@@ -55,6 +55,26 @@ let tests =
           )
 
           testAsync (
+              "debounce emits without completing the source",
+              async {
+                  // Arrange
+                  let dispatch, source = Reactive.subject<int> ()
+                  let debounced = source |> Reactive.debounce 50
+                  let obv = TestObserver<int>()
+
+                  // Act
+                  let! sub = debounced.SubscribeAsync obv
+                  do! dispatch.OnNextAsync 1
+                  do! obv.WaitUntil(List.contains (OnNext 1))
+                  do! sub.DisposeAsync()
+
+                  // Assert
+                  let actual = obv.Notifications |> Seq.toList
+                  assertThat actual (contain (OnNext 1))
+              }
+          )
+
+          testAsync (
               "debounce emits last value after timeout",
               async {
                   // Arrange
