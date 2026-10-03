@@ -39,10 +39,12 @@ let isOnError (n: Notification<'a>) =
 
 /// Immutable snapshot of the observer state, returned across the process boundary.
 type private Snapshot<'a> =
-    { Notifications: Notification<'a> list
-      Latest: 'a option
-      Error: exn option
-      Completed: bool }
+    {
+        Notifications: Notification<'a> list
+        Latest: 'a option
+        Error: exn option
+        Completed: bool
+    }
 
 type private Cmd<'a> =
     | Post of Notification<'a>
@@ -93,10 +95,12 @@ let TestObserver<'a> () : ITestObserver<'a> =
                             | OnCompleted -> ns, latest, error, true
 
                     rc.Reply
-                        { Notifications = notifications'
-                          Latest = latest'
-                          Error = error'
-                          Completed = completed' }
+                        {
+                            Notifications = notifications'
+                            Latest = latest'
+                            Error = error'
+                            Completed = completed'
+                        }
 
                     return! loop (notifications', latest', error', completed')
                 }
@@ -178,7 +182,8 @@ let TestObserver<'a> () : ITestObserver<'a> =
             async {
                 let! _ = awaitSnapshot ()
                 return ()
-            } }
+            }
+    }
 
 /// Poll until the predicate holds. Cross-target: no Task or blocking primitives,
 /// only `Async.Sleep`, which every Fable target implements.

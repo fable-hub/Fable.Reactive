@@ -35,7 +35,8 @@ module internal Aggregation =
             |> autoDetach
 
         { new IAsyncObservable<'TState> with
-            member __.SubscribeAsync o = subscribeAsync o }
+            member __.SubscribeAsync o = subscribeAsync o
+        }
 
     /// Applies an async accumulator function over an observable sequence and returns each intermediate result. The
     /// first value is used as the initial accumulator value. Returns an observable sequence containing the accumulated
@@ -70,7 +71,8 @@ module internal Aggregation =
             |> autoDetach
 
         { new IAsyncObservable<'TSource> with
-            member __.SubscribeAsync o = subscribeAsync o }
+            member __.SubscribeAsync o = subscribeAsync o
+        }
 
 
     let reduceAsync (accumulator: 'TSource -> 'TSource -> Async<'TSource>) : AsyncStream<'TSource, 'TSource> =
@@ -159,4 +161,5 @@ module internal Aggregation =
             }
 
         { new IAsyncObservable<IAsyncObservable<'TSource>> with
-            member __.SubscribeAsync o = subscribeAsync o }
+            member __.SubscribeAsync o = subscribeAsync o
+        }

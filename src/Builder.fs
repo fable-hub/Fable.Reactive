@@ -12,17 +12,13 @@ type QueryBuilder() =
     member this.Delay(fn) = fn ()
 
     member this.Bind
-        (
-            source: IAsyncObservable<'TSource>,
-            fn: 'TSource -> IAsyncObservable<'TResult>
-        ) : IAsyncObservable<'TResult> =
+        (source: IAsyncObservable<'TSource>, fn: 'TSource -> IAsyncObservable<'TResult>)
+        : IAsyncObservable<'TResult> =
         Transform.flatMap fn source
 
     member x.For
-        (
-            source: IAsyncObservable<_>,
-            func: 'TSource -> IAsyncObservable<'TResult>
-        ) : IAsyncObservable<'TResult> =
+        (source: IAsyncObservable<_>, func: 'TSource -> IAsyncObservable<'TResult>)
+        : IAsyncObservable<'TResult> =
         Transform.concatMap func source
 
     // Async to AsyncObservable conversion

@@ -75,7 +75,8 @@ module AsyncDisposable =
 
         member this.ToDisposable() =
             { new IDisposable with
-                member __.Dispose() = this.DisposeAsync() |> Async.Start' }
+                member __.Dispose() = this.DisposeAsync() |> Async.Start'
+            }
 
     type System.IDisposable with
 

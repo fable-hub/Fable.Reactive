@@ -32,13 +32,15 @@ module internal Tap =
                             async {
                                 do! onCompletedAsync ()
                                 do! obvAsync.OnCompletedAsync()
-                            } }
+                            }
+                    }
 
                 return! source.SubscribeAsync _obv
             }
 
         { new IAsyncObservable<'TSource> with
-            member __.SubscribeAsync o = subscribeAsync o }
+            member __.SubscribeAsync o = subscribeAsync o
+        }
 
     /// Tap asynchronously into the stream performing side effects by the given `onNextAsync` action.
     let tapOnNextAsync (onNextAsync: 'TSource -> Async<unit>) : AsyncStream<'TSource> =

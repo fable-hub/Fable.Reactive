@@ -14,7 +14,8 @@ module internal ActorInterop =
         { new IAsyncObserver<'T> with
             member _.OnNextAsync x = async { actor.Post(OnNext x) }
             member _.OnErrorAsync err = async { actor.Post(OnError err) }
-            member _.OnCompletedAsync() = async { actor.Post OnCompleted } }
+            member _.OnCompletedAsync() = async { actor.Post OnCompleted }
+        }
 
     /// Subscribe an observable to an actor that receives Notification<'T>.
     /// Actor lifecycle is caller-managed.
@@ -39,7 +40,7 @@ module internal ActorInterop =
         : IAsyncObservable<'TResult> =
         let subscribeAsync (aobv: IAsyncObserver<'TResult>) =
             async {
-                let dispatch, stream = Subjects.subject<'TResult> ()
+                let dispatch, stream = Subjects.subject<'TResult>()
                 let! innerDisp = stream.SubscribeAsync aobv
 
                 let emit value =
@@ -109,19 +110,23 @@ module internal ActorInterop =
                     { new IAsyncObserver<'TSource> with
                         member _.OnNextAsync x = async { monitor.Post(box x) }
                         member _.OnErrorAsync err = aobv.OnErrorAsync err
-                        member _.OnCompletedAsync() = aobv.OnCompletedAsync() }
+                        member _.OnCompletedAsync() = aobv.OnCompletedAsync()
+                    }
 
                 let! sourceDisp = source.SubscribeAsync obv
 
                 return
                     AsyncDisposable.Composite
-                        [ sourceDisp
-                          innerDisp
-                          AsyncDisposable.Create(fun () -> async { Actor.kill monitor }) ]
+                        [
+                            sourceDisp
+                            innerDisp
+                            AsyncDisposable.Create(fun () -> async { Actor.kill monitor })
+                        ]
             }
 
         { new IAsyncObservable<'TResult> with
-            member _.SubscribeAsync o = subscribeAsync o }
+            member _.SubscribeAsync o = subscribeAsync o
+        }
 
     /// For each upstream item, posts it to a per-subscription actor.
     /// The actor emits downstream via an emit callback provided at spawn time.
@@ -165,7 +170,8 @@ module internal ActorInterop =
                             }
 
                         member _.OnErrorAsync err = aobv.OnErrorAsync err
-                        member _.OnCompletedAsync() = aobv.OnCompletedAsync() }
+                        member _.OnCompletedAsync() = aobv.OnCompletedAsync()
+                    }
 
                 let! disp = source.SubscribeAsync obv
 
@@ -173,7 +179,8 @@ module internal ActorInterop =
             }
 
         { new IAsyncObservable<'TResult> with
-            member _.SubscribeAsync o = subscribeAsync o }
+            member _.SubscribeAsync o = subscribeAsync o
+        }
 
     /// Create an actor-backed subject. The actor body receives an emit callback.
     /// Returns the actor (for posting messages) and an observable (for subscribing).
@@ -182,7 +189,7 @@ module internal ActorInterop =
     /// decision: spawns the actor eagerly and multicasts its output so subscribers share one actor lifecycle
     /// tradeoff: emissions before the first subscription can be lost because the backing subject has no replay buffer
     let ofActor (body: ('T -> unit) -> Actor<'Msg> -> ActorOp<unit>) : Actor<'Msg> * IAsyncObservable<'T> =
-        let dispatch, stream = Subjects.subject<'T> ()
+        let dispatch, stream = Subjects.subject<'T>()
 
         let emit value =
             dispatch.OnNextAsync value |> Async.Start'

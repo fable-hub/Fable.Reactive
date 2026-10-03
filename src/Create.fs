@@ -17,7 +17,8 @@ module internal Create =
     /// given subscribe function.
     let create (subscribe: IAsyncObserver<'TSource> -> Async<IReactiveDisposable>) : IAsyncObservable<'TSource> =
         { new IAsyncObservable<'TSource> with
-            member _.SubscribeAsync o = subscribe o }
+            member _.SubscribeAsync o = subscribe o
+        }
 
     // Creates a cold observable from an asynchronous worker.
     //
@@ -36,7 +37,8 @@ module internal Create =
             }
 
         { new IAsyncObservable<'TSource> with
-            member _.SubscribeAsync o = subscribeAsync o }
+            member _.SubscribeAsync o = subscribeAsync o
+        }
 
     /// Returns the async observable sequence whose single element is the result of the given async workflow.
     let ofAsync (workflow: Async<'TSource>) : IAsyncObservable<'TSource> =
@@ -62,7 +64,8 @@ module internal Create =
             }
 
         { new IAsyncObservable<'TSource> with
-            member _.SubscribeAsync o = subscribeAsync o }
+            member _.SubscribeAsync o = subscribeAsync o
+        }
 
     /// Returns an observable sequence with no elements.
     let inline empty<'TSource> () : IAsyncObservable<'TSource> =
@@ -73,14 +76,16 @@ module internal Create =
             }
 
         { new IAsyncObservable<'TSource> with
-            member _.SubscribeAsync o = subscribeAsync o }
+            member _.SubscribeAsync o = subscribeAsync o
+        }
 
     /// Returns an empty observable sequence that never completes.
     let inline never<'TSource> () : IAsyncObservable<'TSource> =
         let subscribeAsync (_: IAsyncObserver<_>) : Async<IReactiveDisposable> = async { return AsyncDisposable.Empty }
 
         { new IAsyncObservable<'TSource> with
-            member _.SubscribeAsync o = subscribeAsync o }
+            member _.SubscribeAsync o = subscribeAsync o
+        }
 
     /// Returns the observable sequence that terminates exceptionally
     /// with the specified exception.
@@ -115,7 +120,8 @@ module internal Create =
             }
 
         { new IAsyncObservable<'TSource> with
-            member _.SubscribeAsync o = subscribeAsync o }
+            member _.SubscribeAsync o = subscribeAsync o
+        }
 
     /// Returns an observable sequence that triggers the increasing sequence starting with 0 after the given msecs, and
     /// the after each period.
@@ -140,7 +146,8 @@ module internal Create =
             }
 
         { new IAsyncObservable<int> with
-            member _.SubscribeAsync o = subscribeAsync o }
+            member _.SubscribeAsync o = subscribeAsync o
+        }
 
     /// Returns an observable sequence that triggers the value 0
     /// after the given duetime in milliseconds.

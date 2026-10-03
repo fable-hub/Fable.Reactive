@@ -16,11 +16,13 @@ module internal Transform =
             { new IAsyncObserver<'TSource> with
                 member _.OnNextAsync x = nextAsync aobv.OnNextAsync x
                 member _.OnErrorAsync err = aobv.OnErrorAsync err
-                member _.OnCompletedAsync() = aobv.OnCompletedAsync() }
+                member _.OnCompletedAsync() = aobv.OnCompletedAsync()
+            }
             |> source.SubscribeAsync
 
         { new IAsyncObservable<'TResult> with
-            member _.SubscribeAsync o = subscribeAsync o }
+            member _.SubscribeAsync o = subscribeAsync o
+        }
 
     /// Returns an observable sequence whose elements are the result of invoking the async mapper function on each
     /// element of the source.
@@ -101,7 +103,8 @@ module internal Transform =
                                 match agentRef with
                                 | Some a -> a.Post(InnerCompleted id)
                                 | None -> ()
-                            } }
+                            }
+                    }
 
                 let agent =
                     Actor.spawn (fun inbox ->
@@ -170,7 +173,8 @@ module internal Transform =
             }
 
         { new IAsyncObservable<'TSource> with
-            member _.SubscribeAsync o = subscribeAsync o }
+            member _.SubscribeAsync o = subscribeAsync o
+        }
 
     /// Asynchronosly transforms the items emitted by an source sequence into observable streams, and mirror those items
     /// emitted by the most-recently transformed observable sequence.
@@ -204,7 +208,8 @@ module internal Transform =
                                     let nextSource = handler err
                                     action nextSource
 
-                                member _.OnCompletedAsync() = aobv.OnCompletedAsync() }
+                                member _.OnCompletedAsync() = aobv.OnCompletedAsync()
+                            }
 
                         do! disposable.DisposeAsync()
                         let! subscription = source.SubscribeAsync _obv
@@ -217,7 +222,8 @@ module internal Transform =
             }
 
         { new IAsyncObservable<'TSource> with
-            member _.SubscribeAsync o = subscribeAsync o }
+            member _.SubscribeAsync o = subscribeAsync o
+        }
 
     let retry (retryCount: int) (source: IAsyncObservable<'TSource>) =
         let mutable count = retryCount
@@ -239,7 +245,7 @@ module internal Transform =
     /// original Observable. As long as there is at least one Subscriber this Observable will be subscribed and emitting
     /// data. When all subscribers have unsubscribed it will unsubscribe from the source Observable.
     let share (source: IAsyncObservable<'TSource>) : IAsyncObservable<'TSource> =
-        let dispatch, stream = Subjects.subject<'TSource> ()
+        let dispatch, stream = Subjects.subject<'TSource>()
 
         let mb =
             Actor.spawn (fun inbox ->
@@ -283,7 +289,8 @@ module internal Transform =
             }
 
         { new IAsyncObservable<'TSource> with
-            member _.SubscribeAsync o = subscribeAsync o }
+            member _.SubscribeAsync o = subscribeAsync o
+        }
 
     let toObservable (source: IAsyncObservable<'TSource>) : IObservable<'TSource> =
         let mutable subscription: IReactiveDisposable = AsyncDisposable.Empty
@@ -297,4 +304,5 @@ module internal Transform =
                 }
                 |> Async.Start'
 
-                subscription.ToDisposable() }
+                subscription.ToDisposable()
+        }

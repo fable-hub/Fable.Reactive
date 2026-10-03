@@ -31,7 +31,8 @@ module AsyncObserver =
             { new IObserver<'T> with
                 member __.OnNext x = this.OnNextAsync x |> Async.Start'
                 member __.OnError err = this.OnErrorAsync err |> Async.Start'
-                member __.OnCompleted() = this.OnCompletedAsync() |> Async.Start' }
+                member __.OnCompleted() = this.OnCompletedAsync() |> Async.Start'
+            }
 
     type IObserver<'T> with
 
@@ -40,7 +41,8 @@ module AsyncObserver =
             { new IAsyncObserver<'T> with
                 member __.OnNextAsync x = async { this.OnNext x }
                 member __.OnErrorAsync err = async { this.OnError err }
-                member __.OnCompletedAsync() = async { this.OnCompleted() } }
+                member __.OnCompletedAsync() = async { this.OnCompleted() }
+            }
 
     /// Safe observer that wraps the given observer. Makes sure that invocations are serialized and that the Rx grammar
     /// (OnNext* (OnError|OnCompleted)?) is not violated.
@@ -85,7 +87,8 @@ module AsyncObserver =
         { new IAsyncObserver<'TSource> with
             member this.OnNextAsync x = async { OnNext x |> agent.Post }
             member this.OnErrorAsync err = async { OnError err |> agent.Post }
-            member this.OnCompletedAsync() = async { OnCompleted |> agent.Post } }
+            member this.OnCompletedAsync() = async { OnCompleted |> agent.Post }
+        }
 
     type private Msg =
         | Disposable of IReactiveDisposable
