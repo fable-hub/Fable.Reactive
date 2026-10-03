@@ -34,7 +34,7 @@ jobs:
       run: dotnet run --project test --configuration Release --no-restore
 
   # Compile-only gate for the Fable targets. The cross-target *suites* are not green yet
-  # (JS 82/84, Python 79/84, BEAM 14/84 — see CLAUDE.md), so they cannot gate anything, but
+  # (see the measured baseline in CLAUDE.md), so they cannot gate anything, but
   # compilation is binary and already passes on all three. This keeps a change to src/ from
   # silently breaking a target between manual `just test-<target>` runs.
   #
