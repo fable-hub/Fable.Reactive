@@ -290,7 +290,9 @@ let tests =
                         assertThat (observer.Notifications |> Seq.exists isOnError) isFalse
                     finally
                         releaseRestart.Set()
-                        subscription.DisposeAsync() |> Async.RunSynchronously
+
+                        subscription.DisposeAsync()
+                        |> Async.RunSynchronously
                 }
             )
 #endif
