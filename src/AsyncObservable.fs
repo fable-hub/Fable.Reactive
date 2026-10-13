@@ -354,18 +354,20 @@ module Reactive =
         ActorInterop.subscribeActor actor source
 
     /// For each upstream item, posts it to a supervised per-subscription actor.
+    /// The handler receives an ActorInbox for receiving messages; share inbox.Reference for posting.
     /// The decider controls crash behavior: Escalate (OnError), Stop (drop), Restart (retry).
     let flatMapActorSupervised
         (decide: exn -> Directive)
-        (handler: ('b -> unit) -> Actor<'a> -> ActorOp<unit>)
+        (handler: ('b -> unit) -> ActorInbox<'a> -> ActorOp<unit>)
         (source: IAsyncObservable<'a>)
         : IAsyncObservable<'b> =
         ActorInterop.flatMapActorSupervised decide handler source
 
     /// For each upstream item, posts it to a per-subscription actor.
     /// The actor emits downstream via an emit callback. Actor crash → OnError.
+    /// The handler receives an ActorInbox for receiving messages; share inbox.Reference for posting.
     let flatMapActor
-        (handler: ('b -> unit) -> Actor<'a> -> ActorOp<unit>)
+        (handler: ('b -> unit) -> ActorInbox<'a> -> ActorOp<unit>)
         (source: IAsyncObservable<'a>)
         : IAsyncObservable<'b> =
         ActorInterop.flatMapActor handler source
@@ -379,6 +381,7 @@ module Reactive =
         : IAsyncObservable<'b> =
         ActorInterop.mapActor handler initialState source
 
-    /// Create an actor-backed subject. Returns the actor and an observable.
-    let ofActor (body: ('a -> unit) -> Actor<'msg> -> ActorOp<unit>) : Actor<'msg> * IAsyncObservable<'a> =
+    /// Create an actor-backed subject. The body receives an ActorInbox for receiving messages.
+    /// Returns a send-only Actor reference and an observable.
+    let ofActor (body: ('a -> unit) -> ActorInbox<'msg> -> ActorOp<unit>) : Actor<'msg> * IAsyncObservable<'a> =
         ActorInterop.ofActor body

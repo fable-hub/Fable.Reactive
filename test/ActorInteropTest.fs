@@ -110,6 +110,27 @@ let tests =
             )
 
             testAsync (
+                "mapActor reports handler failure instead of waiting forever",
+                async {
+                    let result =
+                        fromNotification [ OnNext 1 ]
+                        |> Reactive.mapActor (fun _ _ -> failwith "handler failed") 0
+
+                    let observer = TestObserver<int>()
+                    let! subscription = result.SubscribeAsync observer
+                    do! observer.WaitUntil(List.exists isOnError)
+
+                    assertThat
+                        (observer.Notifications
+                         |> Seq.filter isOnError
+                         |> Seq.length)
+                        (isEqualTo 1)
+
+                    do! subscription.DisposeAsync()
+                }
+            )
+
+            testAsync (
                 "flatMapActorSupervised Stop continues stream after crash",
                 async {
                     let xs = fromNotification [ OnNext 1; OnNext 2; OnNext 3; OnCompleted ]

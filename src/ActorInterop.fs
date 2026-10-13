@@ -35,7 +35,7 @@ module internal ActorInterop =
     /// tradeoff: Stop and Restart keep the stream alive by dropping the item that crashed the child
     let flatMapActorSupervised
         (decide: exn -> Directive)
-        (handler: ('TResult -> unit) -> Actor<'TSource> -> ActorOp<unit>)
+        (handler: ('TResult -> unit) -> ActorInbox<'TSource> -> ActorOp<unit>)
         (source: IAsyncObservable<'TSource>)
         : IAsyncObservable<'TResult> =
         let subscribeAsync (aobv: IAsyncObserver<'TResult>) =
@@ -67,7 +67,7 @@ module internal ActorInterop =
                         // decision: traps linked exits so the monitor, rather than the runtime, applies the decider
                         Actor.trapExits ()
 
-                        let mutable child = Actor.spawnLinked inbox (handler emit)
+                        let mutable child = Actor.spawnLinked (inbox.Reference, handler emit)
 
                         let rec loop () =
                             actor {
@@ -89,7 +89,8 @@ module internal ActorInterop =
                                                 match decide ex with
                                                 | Directive.Escalate -> do! escalate ex
                                                 | Directive.Stop -> ()
-                                                | Directive.Restart -> child <- Actor.spawnLinked inbox (handler emit)
+                                                | Directive.Restart ->
+                                                    child <- Actor.spawnLinked (inbox.Reference, handler emit)
                                             // Both backends normalize linked exits to ChildExited before this point.
                                             // assumption: every other mailbox item is a boxed TSource value
                                             | None -> child.Post(unbox<'TSource> msg)
@@ -133,7 +134,7 @@ module internal ActorInterop =
     /// Terminal events bypass the actor and go directly to downstream.
     /// If the actor crashes, the error is forwarded downstream as OnErrorAsync.
     let flatMapActor
-        (handler: ('TResult -> unit) -> Actor<'TSource> -> ActorOp<unit>)
+        (handler: ('TResult -> unit) -> ActorInbox<'TSource> -> ActorOp<unit>)
         (source: IAsyncObservable<'TSource>)
         : IAsyncObservable<'TResult> =
         flatMapActorSupervised (fun _ -> Directive.Escalate) handler source
@@ -165,7 +166,7 @@ module internal ActorInterop =
                     { new IAsyncObserver<'TSource> with
                         member _.OnNextAsync x =
                             async {
-                                let! result = Actor.callAsync actor x
+                                let! result = Actor.asyncCall actor x
                                 do! aobv.OnNextAsync result
                             }
 
@@ -188,7 +189,7 @@ module internal ActorInterop =
     ///
     /// decision: spawns the actor eagerly and multicasts its output so subscribers share one actor lifecycle
     /// tradeoff: emissions before the first subscription can be lost because the backing subject has no replay buffer
-    let ofActor (body: ('T -> unit) -> Actor<'Msg> -> ActorOp<unit>) : Actor<'Msg> * IAsyncObservable<'T> =
+    let ofActor (body: ('T -> unit) -> ActorInbox<'Msg> -> ActorOp<unit>) : Actor<'Msg> * IAsyncObservable<'T> =
         let dispatch, stream = Subjects.subject<'T>()
 
         let emit value =

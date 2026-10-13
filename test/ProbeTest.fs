@@ -25,7 +25,7 @@ let tests =
         "Probe",
         [
             testAsync (
-                "callAsync round-trips",
+                "asyncCall round-trips",
                 async {
                     let store =
                         Actor.spawn (fun inbox ->
@@ -38,13 +38,13 @@ let tests =
 
                             loop ())
 
-                    let! r = Actor.callAsync store 0
+                    let! r = Actor.asyncCall store 0
                     assertThat r (isEqualTo 42)
                 }
             )
 
             testAsync (
-                "cast then callAsync sees the state",
+                "cast then asyncCall sees the state",
                 async {
                     let store =
                         Actor.spawn (fun inbox ->
@@ -60,7 +60,7 @@ let tests =
 
                     Actor.cast store 5
                     Actor.cast store 7
-                    let! total = Actor.callAsync store -1
+                    let! total = Actor.asyncCall store -1
                     assertThat total (isEqualTo 12)
                 }
             )
@@ -80,7 +80,7 @@ let tests =
 
                             loop ())
 
-                    let! r = Actor.callAsync a 41
+                    let! r = Actor.asyncCall a 41
                     assertThat r (isEqualTo 42)
                 }
             )
@@ -100,7 +100,7 @@ let tests =
 
                             loop ())
 
-                    let! r = Actor.callAsync a 41
+                    let! r = Actor.asyncCall a 41
                     assertThat r (isEqualTo 42)
                 }
             )
@@ -129,7 +129,7 @@ let tests =
 
                             loop ())
 
-                    let! r = Actor.callAsync a 41
+                    let! r = Actor.asyncCall a 41
                     assertThat r (isEqualTo 42)
                 }
             )
@@ -158,7 +158,7 @@ let tests =
 
                     let! _sub = (Reactive.single 42).SubscribeAsync obv
                     do! Async.Sleep 100
-                    let! got = Actor.callAsync sink -1
+                    let! got = Actor.asyncCall sink -1
                     assertThat got (isEqualTo 42)
                 }
             )
@@ -181,7 +181,7 @@ let tests =
                     let obv = ProbeSink(sink) :> IAsyncObserver<int>
                     let! _sub = (Reactive.single 42).SubscribeAsync obv
                     do! Async.Sleep 100
-                    let! got = Actor.callAsync sink -1
+                    let! got = Actor.asyncCall sink -1
                     assertThat got (isEqualTo 42)
                 }
             )

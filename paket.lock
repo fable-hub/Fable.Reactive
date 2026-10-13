@@ -7,38 +7,38 @@ NUGET
     FSharp.Control.AsyncSeq (3.2.1)
       FSharp.Core (>= 4.7.2)
       Microsoft.Bcl.AsyncInterfaces (>= 5.0)
-    FSharp.Core (10.1.301)
+    FSharp.Core (10.1.402)
     Microsoft.Bcl.AsyncInterfaces (10.0.2)
 
 GROUP Reactive
 RESTRICTION: == netstandard2.0
 NUGET
   remote: https://api.nuget.org/v3/index.json
-    Fable.Actor (5.0.0-rc.11)
-      Fable.Beam (>= 5.0.0-rc.32)
+    Fable.Actor (5.0.0-rc.17)
+      Fable.Beam (>= 5.2)
       Fable.Core (>= 5.0)
-      FSharp.Core (>= 10.1.301)
-    Fable.Beam (5.0.0-rc.32)
+      FSharp.Core (>= 10.1.402)
+    Fable.Beam (5.2)
       Fable.Core (>= 5.0)
       FSharp.Core (>= 5.0)
     Fable.Core (5.0)
       FSharp.Core (>= 4.7.2)
-    FSharp.Core (10.1.301)
+    FSharp.Core (10.1.402)
 
 GROUP Test
 RESTRICTION: == net10.0
 NUGET
   remote: https://api.nuget.org/v3/index.json
-    Fable.Actor (5.0.0-rc.11)
-      Fable.Beam (>= 5.0.0-rc.32)
+    Fable.Actor (5.0.0-rc.17)
+      Fable.Beam (>= 5.2)
       Fable.Core (>= 5.0)
-      FSharp.Core (>= 10.1.301)
-    Fable.Beam (5.0.0-rc.32)
+      FSharp.Core (>= 10.1.402)
+    Fable.Beam (5.2)
       Fable.Core (>= 5.0)
       FSharp.Core (>= 5.0)
     Fable.Core (5.2)
       FSharp.Core (>= 4.7.2)
-    FSharp.Core (10.1.301)
+    FSharp.Core (10.1.402)
     Scriptorium.Ink (0.5)
       Fable.Core (>= 5.2)
       FSharp.Core (>= 10.0.101)

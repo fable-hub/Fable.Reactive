@@ -2,22 +2,23 @@ group Reactive
     source https://api.nuget.org/v3/index.json
     framework: netstandard2.0
 
-    nuget FSharp.Core >= 5.0.0 lowest_matching: true
+    // decision: aligns dependency groups with Fable.Actor's FSharp.Core minimum to avoid assembly conflicts
+    nuget FSharp.Core >= 10.1.402 lowest_matching: true
     nuget Fable.Core >= 5.0.0 lowest_matching: true
-    nuget Fable.Actor 5.0.0-rc.11
+    nuget Fable.Actor 5.0.0-rc.17
 
 group AsyncSeq
     source https://api.nuget.org/v3/index.json
     framework: netstandard2.1
 
-    nuget FSharp.Core >= 5.0.0 lowest_matching: true
+    nuget FSharp.Core >= 10.1.402 lowest_matching: true
     nuget FSharp.Control.AsyncSeq
 
 group Test
     source https://api.nuget.org/v3/index.json
     framework: net10.0
 
-    nuget FSharp.Core >= 10.1.301 lowest_matching: true
-    nuget Fable.Actor 5.0.0-rc.11
+    nuget FSharp.Core >= 10.1.402 lowest_matching: true
+    nuget Fable.Actor 5.0.0-rc.17
     nuget Scriptorium.Quill
     nuget Scriptorium.Nib
