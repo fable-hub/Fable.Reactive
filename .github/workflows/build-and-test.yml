@@ -33,23 +33,15 @@ jobs:
     - name: Test
       run: dotnet run --project test --configuration Release --no-restore
 
-  # Compile-only gate for the Fable targets. The cross-target *suites* are not green yet
-  # (see the measured baseline in CLAUDE.md), so they cannot gate anything, but
-  # compilation is binary and already passes on all three. This keeps a change to src/ from
-  # silently breaking a target between manual `just test-<target>` runs.
-  #
-  # Nothing is executed, only compiled, so no Node, uv, rebar3 or erl is needed.
-  # fail-fast is off so one broken target does not mask the state of the others.
-  # decision: gates Fable compilation while known runtime gaps keep cross-target execution non-gating
-  # tradeoff: compilation catches portability errors but cannot detect target-specific runtime regressions
-  fable-compile:
-
+  # decision: executes the shared Scriptorium suite on every Fable target so runtime regressions fail CI
+  fable-test:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     strategy:
       fail-fast: false
       matrix:
-        lang: [beam, javascript, python]
+        target: [js, python, beam]
 
     steps:
     - uses: actions/checkout@v5
@@ -57,11 +49,28 @@ jobs:
       uses: actions/setup-dotnet@v5
       with:
         dotnet-version: 10.0.x
-        dotnet-quality: preview
-    # Pulls the `fable` tool pinned in .config/dotnet-tools.json.
-    - name: Setup paket
-      run: dotnet tool restore
-    - name: Install dependencies
-      run: dotnet restore
-    - name: Compile src to ${{ matrix.lang }}
-      run: dotnet fable src --lang ${{ matrix.lang }} --outDir build/gate-${{ matrix.lang }}
+    - name: Install just
+      uses: extractions/setup-just@v3
+    - name: Setup Node
+      if: matrix.target == 'js'
+      uses: actions/setup-node@v7
+      with:
+        node-version: '24'
+    - name: Setup Python
+      if: matrix.target == 'python'
+      uses: actions/setup-python@v6
+      with:
+        python-version: '3.13'
+    - name: Setup uv
+      if: matrix.target == 'python'
+      uses: astral-sh/setup-uv@v7
+    - name: Setup BEAM
+      if: matrix.target == 'beam'
+      uses: erlef/setup-beam@v1
+      with:
+        otp-version: '27'
+        rebar3-version: '3'
+    - name: Restore tools and dependencies
+      run: just restore
+    - name: Run ${{ matrix.target }} suite
+      run: just test-${{ matrix.target }}

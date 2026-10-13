@@ -1,6 +1,5 @@
 namespace Fable.Reactive
 
-open System.Collections.Generic
 open Fable.Actor
 open Fable.Reactive.Core
 
@@ -94,26 +93,24 @@ module internal Filter =
         let subscribeAsync (obvAsync: IAsyncObserver<'TSource>) =
             let safeObv, autoDetach = autoDetachObserver obvAsync
 
-            async {
-                let mutable remaining = count
+            let update remaining n =
+                async {
+                    match n with
+                    | OnNext x when remaining <= 0 ->
+                        do! safeObv.OnNextAsync x
+                        return remaining
+                    | OnNext _ -> return remaining - 1
+                    | OnError ex ->
+                        do! safeObv.OnErrorAsync ex
+                        return remaining
+                    | OnCompleted ->
+                        do! safeObv.OnCompletedAsync()
+                        return remaining
+                }
 
-                let _obv (n: Notification<'TSource>) =
-                    async {
-                        match n with
-                        | OnNext x ->
-                            if remaining <= 0 then
-                                do! safeObv.OnNextAsync x
-                            else
-                                remaining <- remaining - 1
-
-                        | OnError ex -> do! safeObv.OnErrorAsync ex
-                        | OnCompleted -> do! safeObv.OnCompletedAsync()
-                    }
-
-                return!
-                    source.SubscribeAsync(AsyncObserver.Create _obv)
-                    |> autoDetach
-            }
+            statefulObserver count update
+            |> source.SubscribeAsync
+            |> autoDetach
 
         { new IAsyncObservable<'TSource> with
             member _.SubscribeAsync o = subscribeAsync o
@@ -124,28 +121,28 @@ module internal Filter =
         let subscribeAsync (obvAsync: IAsyncObserver<'TSource>) =
             let safeObv, autoDetach = autoDetachObserver obvAsync
 
-            async {
-                let mutable remaining = count
+            let update remaining n =
+                async {
+                    match n with
+                    | OnNext x when remaining > 0 ->
+                        do! safeObv.OnNextAsync x
 
-                let _obv (n: Notification<'TSource>) : Async<unit> =
-                    match n, remaining with
-                    | OnNext x, n when n > 1 ->
-                        remaining <- n - 1
-                        safeObv.OnNextAsync x
-                    | OnNext x, n when n = 1 ->
-                        async {
-                            remaining <- 0
-                            do! safeObv.OnNextAsync x
+                        if remaining = 1 then
                             do! safeObv.OnCompletedAsync()
-                        }
-                    | OnNext _, _ -> Async.empty
-                    | OnError ex, _ -> safeObv.OnErrorAsync ex
-                    | OnCompleted, _ -> safeObv.OnCompletedAsync()
 
-                return!
-                    source.SubscribeAsync(AsyncObserver.Create _obv)
-                    |> autoDetach
-            }
+                        return remaining - 1
+                    | OnNext _ -> return remaining
+                    | OnError ex ->
+                        do! safeObv.OnErrorAsync ex
+                        return remaining
+                    | OnCompleted ->
+                        do! safeObv.OnCompletedAsync()
+                        return remaining
+                }
+
+            statefulObserver count update
+            |> source.SubscribeAsync
+            |> autoDetach
 
         { new IAsyncObservable<'TSource> with
             member _.SubscribeAsync o = subscribeAsync o
@@ -155,29 +152,27 @@ module internal Filter =
     let takeLast (count: int) (source: IAsyncObservable<'TSource>) : IAsyncObservable<'TSource> =
         let subscribeAsync (aobv: IAsyncObserver<'TSource>) =
             let safeObv, autoDetach = autoDetachObserver aobv
-            let queue = List<'TSource>()
 
-            async {
-                let _obv (n: Notification<'TSource>) =
-                    async {
-                        match n with
-                        | OnNext x ->
-                            queue.Add x
+            let update queue n =
+                async {
+                    match n with
+                    | OnNext x ->
+                        let next = queue @ [ x ]
+                        return if List.length next > count then List.tail next else next
+                    | OnError ex ->
+                        do! safeObv.OnErrorAsync ex
+                        return []
+                    | OnCompleted ->
+                        for item in queue do
+                            do! safeObv.OnNextAsync item
 
-                            if queue.Count > count then
-                                queue.RemoveAt 0
-                        | OnError ex -> do! safeObv.OnErrorAsync ex
-                        | OnCompleted ->
-                            for item in queue do
-                                do! safeObv.OnNextAsync item
+                        do! safeObv.OnCompletedAsync()
+                        return []
+                }
 
-                            do! safeObv.OnCompletedAsync()
-                    }
-
-                return!
-                    source.SubscribeAsync(AsyncObserver.Create _obv)
-                    |> autoDetach
-            }
+            statefulObserver [] update
+            |> source.SubscribeAsync
+            |> autoDetach
 
         { new IAsyncObservable<'TSource> with
             member _.SubscribeAsync o = subscribeAsync o

@@ -10,21 +10,21 @@
       "rollForward": false
     },
     "paket": {
-      "version": "10.3.1",
+      "version": "11.0.0",
       "commands": [
         "paket"
       ],
       "rollForward": false
     },
     "fantomas": {
-      "version": "8.0.5",
+      "version": "8.0.7",
       "commands": [
         "fantomas"
       ],
       "rollForward": false
     },
     "easybuild.shipit": {
-      "version": "3.1.0",
+      "version": "3.2.0",
       "commands": [
         "shipit"
       ],

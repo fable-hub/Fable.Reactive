@@ -1,7 +1,7 @@
 namespace Fable.Reactive
 
-open System.Collections.Generic
 open Fable.Actor
+open Fable.Actor.Types
 
 open Fable.Reactive.Core
 
@@ -75,40 +75,69 @@ module internal Subjects =
 
         AsyncObserver obv :> IAsyncObserver<'TSource>, obs
 
+    type private SubjectMsg<'T> =
+        | Add of IAsyncObserver<'T>
+        | Remove of int
+        | Broadcast of Notification<'T>
+
     /// A mailbox subject is a subscribable mailbox. Each message is broadcasted to all subscribed observers.
+    ///
+    /// decision: owns subscribers inside the actor because BEAM processes cannot share a mutable collection
+    /// invariant: acknowledged subscription changes precede subsequent broadcasts from the caller
     let mbSubject<'TSource> () : Actor<Notification<'TSource>> * IAsyncObservable<'TSource> =
-        let obvs = new List<IAsyncObserver<'TSource>>()
+        let owner =
+            Actor.spawn (fun inbox ->
+                let rec messageLoop subscribers nextId =
+                    actor {
+                        let! (cmd, reply: ReplyChannel<int>) = inbox.Receive()
+
+                        match cmd with
+                        | Add obv ->
+                            reply.Reply nextId
+                            return! messageLoop (subscribers @ [ nextId, obv ]) (nextId + 1)
+                        | Remove id ->
+                            reply.Reply id
+
+                            return!
+                                messageLoop
+                                    (subscribers
+                                     |> List.filter (fun (key, _) -> key <> id))
+                                    nextId
+                        | Broadcast n ->
+                            for _, obv in subscribers do
+                                match n with
+                                | OnNext x -> do! obv.OnNextAsync x
+                                | OnError err -> do! obv.OnErrorAsync err
+                                | OnCompleted -> do! obv.OnCompletedAsync()
+
+                            reply.Reply 0
+                            return! messageLoop subscribers nextId
+                    }
+
+                messageLoop [] 0)
 
         let mb =
             Actor.spawn (fun inbox ->
-                let rec messageLoop () =
+                let rec loop () =
                     actor {
                         let! n = inbox.Receive()
-
-                        match n with
-                        | OnNext x ->
-                            for aobv in obvs do
-                                do! aobv.OnNextAsync x
-
-                        | OnError err ->
-                            for aobv in obvs do
-                                do! aobv.OnErrorAsync err
-
-                        | OnCompleted ->
-                            for aobv in obvs do
-                                do! aobv.OnCompletedAsync()
-
-                        return! messageLoop ()
+                        Actor.cast owner (Broadcast n)
+                        return! loop ()
                     }
 
-                messageLoop ())
+                loop ())
 
         let subscribeAsync (aobv: IAsyncObserver<'TSource>) : Async<IReactiveDisposable> =
             async {
                 let sobv = safeObserver aobv AsyncDisposable.Empty
-                obvs.Add sobv
+                let! id = Actor.asyncCall owner (Add sobv)
 
-                let cancel () = async { obvs.Remove sobv |> ignore }
+                let cancel () =
+                    async {
+                        let! _ = Actor.asyncCall owner (Remove id)
+                        return ()
+                    }
+
                 return AsyncDisposable.Create cancel
             }
 

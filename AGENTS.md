@@ -24,8 +24,8 @@ Use the `justfile` as the task interface:
 
 - `just restore` restores pinned .NET tools and project dependencies.
 - `just build` builds the main library; `just build-release` builds the solution in Release mode.
-- `just test` runs the .NET suite, which is the required green gate.
-- `just test-js`, `just test-python`, and `just test-beam` transpile and run the same suite on other targets. Some cross-target failures are currently documented in `CLAUDE.md`.
+- `just test` runs the .NET suite.
+- `just test-js`, `just test-python`, and `just test-beam` transpile and run the shared Scriptorium suite on other targets. All targets are required CI gates; unresolved upstream failures are documented in `CLAUDE.md`.
 - `just test-all` performs the full cross-target sweep.
 - `just format` formats `src/` and `test/` with Fantomas.
 - `just format-check` checks formatting without modifying files; CI runs the same check.
@@ -41,4 +41,4 @@ Tests use Scriptorium Quill with Nib assertions, not `dotnet test`. Add focused 
 
 ## Commit & Pull Request Guidelines
 
-Use Conventional Commits, matching history such as `fix(beam): trap exits in the supervisor monitor`. Allowed types include `feat`, `fix`, `test`, `docs`, `refactor`, `chore`, `ci`, and `build`. PR titles are checked in CI. Keep PRs focused, explain behavioral changes and target impact, link relevant issues, and report the commands run. Ensure the Release build, .NET suite, and Fable compile checks pass before review.
+Use Conventional Commits, matching history such as `fix(beam): trap exits in the supervisor monitor`. Allowed types include `feat`, `fix`, `test`, `docs`, `refactor`, `chore`, `ci`, and `build`. PR titles are checked in CI. Keep PRs focused, explain behavioral changes and target impact, link relevant issues, and report the commands run. Ensure the Release build, formatting check, and all four runtime suites pass before review.

@@ -14,23 +14,27 @@ module internal Aggregation =
         : IAsyncObservable<'TState> =
         let subscribeAsync (aobv: IAsyncObserver<'TState>) =
             let safeObv, autoDetach = autoDetachObserver aobv
-            let mutable state = initial
 
-            let obv n =
+            let update state n =
                 async {
                     match n with
                     | OnNext x ->
                         try
-                            let! state' = accumulator state x
-                            state <- state'
-                            do! safeObv.OnNextAsync state
+                            let! next = accumulator state x
+                            do! safeObv.OnNextAsync next
+                            return next
                         with err ->
                             do! safeObv.OnErrorAsync err
-                    | OnError e -> do! safeObv.OnErrorAsync e
-                    | OnCompleted -> do! safeObv.OnCompletedAsync()
+                            return state
+                    | OnError e ->
+                        do! safeObv.OnErrorAsync e
+                        return state
+                    | OnCompleted ->
+                        do! safeObv.OnCompletedAsync()
+                        return state
                 }
 
-            AsyncObserver obv
+            statefulObserver initial update
             |> source.SubscribeAsync
             |> autoDetach
 
@@ -47,26 +51,31 @@ module internal Aggregation =
         : IAsyncObservable<'TSource> =
         let subscribeAsync (aobv: IAsyncObserver<'TSource>) =
             let safeObv, autoDetach = autoDetachObserver aobv
-            let mutable aggregate = None
 
-            let obv n =
+            let update state n =
                 async {
                     match n with
                     | OnNext x ->
-                        match aggregate with
-                        | Some state ->
-                            try
-                                let! state' = accumulator state x
-                                aggregate <- Some state'
-                                do! safeObv.OnNextAsync state
-                            with err ->
-                                do! safeObv.OnErrorAsync err
-                        | None -> aggregate <- Some x
-                    | OnError e -> do! safeObv.OnErrorAsync e
-                    | OnCompleted -> do! safeObv.OnCompletedAsync()
+                        try
+                            let! next =
+                                match state with
+                                | Some previous -> accumulator previous x
+                                | None -> async { return x }
+
+                            do! safeObv.OnNextAsync next
+                            return Some next
+                        with err ->
+                            do! safeObv.OnErrorAsync err
+                            return state
+                    | OnError e ->
+                        do! safeObv.OnErrorAsync e
+                        return state
+                    | OnCompleted ->
+                        do! safeObv.OnCompletedAsync()
+                        return state
                 }
 
-            AsyncObserver obv
+            statefulObserver None update
             |> source.SubscribeAsync
             |> autoDetach
 
@@ -132,14 +141,14 @@ module internal Aggregation =
 
                                         return newGroups
                                     | OnError ex ->
-                                        for entry in groups do
-                                            do! entry.Value.OnErrorAsync ex
+                                        for _, group in Map.toList groups do
+                                            do! group.OnErrorAsync ex
 
                                         do! aobv.OnErrorAsync ex
                                         return Map.empty, true
                                     | OnCompleted ->
-                                        for entry in groups do
-                                            do! entry.Value.OnCompletedAsync()
+                                        for _, group in Map.toList groups do
+                                            do! group.OnCompletedAsync()
 
                                         do! aobv.OnCompletedAsync()
                                         return Map.empty, true

@@ -4,11 +4,13 @@ GROUP AsyncSeq
 RESTRICTION: == netstandard2.1
 NUGET
   remote: https://api.nuget.org/v3/index.json
-    FSharp.Control.AsyncSeq (3.2.1)
+    FSharp.Control.AsyncSeq (4.15)
       FSharp.Core (>= 4.7.2)
-      Microsoft.Bcl.AsyncInterfaces (>= 5.0)
+      Microsoft.Bcl.AsyncInterfaces (>= 10.0.6)
+      System.Threading.Channels (>= 10.0.6)
     FSharp.Core (10.1.402)
-    Microsoft.Bcl.AsyncInterfaces (10.0.2)
+    Microsoft.Bcl.AsyncInterfaces (10.0.12)
+    System.Threading.Channels (10.0.12)
 
 GROUP Reactive
 RESTRICTION: == netstandard2.0
@@ -36,7 +38,7 @@ NUGET
     Fable.Beam (5.2)
       Fable.Core (>= 5.0)
       FSharp.Core (>= 5.0)
-    Fable.Core (5.2)
+    Fable.Core (5.3)
       FSharp.Core (>= 4.7.2)
     FSharp.Core (10.1.402)
     Scriptorium.Ink (0.5)
@@ -49,7 +51,7 @@ NUGET
       Fable.Core (>= 5.2)
       FSharp.Core (>= 10.0.101)
       Scriptorium.Ink (>= 0.5)
-    Scriptorium.Quill (0.5.1)
+    Scriptorium.Quill (0.7.1)
       Fable.Core (>= 5.2)
       FSharp.Core (>= 10.0.101)
       Scriptorium.Ink (>= 0.5)

@@ -19,6 +19,7 @@
     <Compile Include="BuilderTest.fs" />
     <Compile Include="CatchTest.fs" />
     <Compile Include="ScanTest.fs" />
+    <Compile Include="StatefulTest.fs" />
     <Compile Include="SubjectTest.fs" />
     <Compile Include="TakeUntilTest.fs" />
     <!-- decision: excludes AsyncSeq tests from Fable builds because they depend on .NET synchronization primitives -->

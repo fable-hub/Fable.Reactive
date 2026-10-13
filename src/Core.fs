@@ -5,6 +5,28 @@ open System.Threading
 module Core =
     let infinite = Seq.initInfinite id
 
+    // decision: shares the disposal gate across BEAM processes because subscriptions cross actor boundaries
+    let internal disposalGate () =
+#if FABLE_COMPILER_BEAM
+        let cell: obj =
+            Fable.Core.BeamInterop.emitErlExpr () "begin A = atomics:new(1, []), atomics:put(A, 1, 0), A end"
+
+        fun () -> Fable.Core.BeamInterop.emitErlExpr cell "atomics:compare_exchange($0, 1, 0, 1) =:= ok"
+#else
+        let mutable disposed = 0
+
+        fun () ->
+#if FABLE_COMPILER
+            if disposed = 0 then
+                disposed <- 1
+                true
+            else
+                false
+#else
+            Interlocked.Exchange(&disposed, 1) = 0
+#endif
+#endif
+
     type Async with
 
         /// Starts the asynchronous computation in the thread pool, or

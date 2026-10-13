@@ -2,6 +2,7 @@ namespace Fable.Reactive
 
 open System
 open Fable.Actor
+open Fable.Actor.Types
 open Fable.Reactive.Core
 
 [<RequireQualifiedAccess>]
@@ -188,37 +189,84 @@ module internal Transform =
     let flatMapLatest (mapper: 'TSource -> IAsyncObservable<'TResult>) : AsyncStream<'TSource, 'TResult> =
         map mapper >> switchLatest
 
+    type private CatchCmd<'T> =
+        | StartCatch
+        | CatchNotification of int * Notification<'T>
+        | DisposeCatch
+
     /// Returns an observable sequence containing the first sequence's elements, followed by the elements of the handler
     /// sequence in case an exception occurred.
+    ///
+    /// decision: serializes fallback subscription and disposal so eager sources cannot overwrite the current subscription
+    /// invariant: disposal acknowledges cleanup of the current subscription and rejects later notifications
     let catch
         (handler: exn -> IAsyncObservable<'TSource>)
         (source: IAsyncObservable<'TSource>)
         : IAsyncObservable<'TSource> =
         let subscribeAsync (aobv: IAsyncObserver<'TSource>) =
+            let safeObv = safeObserver aobv AsyncDisposable.Empty
+
+            let agent =
+                Actor.spawn (fun inbox ->
+                    let observer generation =
+                        AsyncObserver.Create(fun n ->
+                            async { Actor.cast inbox.Reference (CatchNotification(generation, n)) })
+
+                    let rec loop (current: IReactiveDisposable) generation stopped =
+                        actor {
+                            let! (cmd, reply: ReplyChannel<unit>) = inbox.Receive()
+
+                            match cmd with
+                            | StartCatch ->
+                                let! subscription = source.SubscribeAsync(observer generation)
+                                reply.Reply()
+                                return! loop subscription generation stopped
+                            | DisposeCatch ->
+                                do! current.DisposeAsync()
+                                reply.Reply()
+                                return! loop AsyncDisposable.Empty generation true
+                            | CatchNotification(id, n) when not stopped && id = generation ->
+                                match n with
+                                | OnNext x ->
+                                    do! safeObv.OnNextAsync x
+                                    reply.Reply()
+                                    return! loop current generation false
+                                | OnError err ->
+                                    do! current.DisposeAsync()
+
+                                    let! next =
+                                        async {
+                                            try
+                                                let! subscription =
+                                                    (handler err).SubscribeAsync(observer (generation + 1))
+
+                                                return Some subscription
+                                            with failure ->
+                                                do! safeObv.OnErrorAsync failure
+                                                return None
+                                        }
+
+                                    reply.Reply()
+
+                                    match next with
+                                    | Some subscription -> return! loop subscription (generation + 1) false
+                                    | None -> return! loop AsyncDisposable.Empty (generation + 1) true
+                                | OnCompleted ->
+                                    do! current.DisposeAsync()
+                                    do! safeObv.OnCompletedAsync()
+                                    reply.Reply()
+                                    return! loop AsyncDisposable.Empty generation true
+                            | _ ->
+                                reply.Reply()
+                                return! loop current generation stopped
+                        }
+
+                    loop AsyncDisposable.Empty 0 false)
+
             async {
-                let mutable disposable = AsyncDisposable.Empty
+                do! Actor.asyncCall agent StartCatch
 
-                let rec action (source: IAsyncObservable<_>) =
-                    async {
-                        let _obv =
-                            { new IAsyncObserver<'TSource> with
-                                member _.OnNextAsync x = aobv.OnNextAsync x
-
-                                member _.OnErrorAsync err =
-                                    let nextSource = handler err
-                                    action nextSource
-
-                                member _.OnCompletedAsync() = aobv.OnCompletedAsync()
-                            }
-
-                        do! disposable.DisposeAsync()
-                        let! subscription = source.SubscribeAsync _obv
-                        disposable <- subscription
-                    }
-
-                do! action source
-
-                return AsyncDisposable.Create(fun () -> disposable.DisposeAsync())
+                return AsyncDisposable.Create(fun () -> Actor.asyncCall agent DisposeCatch)
             }
 
         { new IAsyncObservable<'TSource> with

@@ -100,7 +100,7 @@ module internal Combine =
 
                                 return { model with IsStopped = true }
                             | Msg.Dispose ->
-                                for KeyValue(_, dispose) in model.Subscriptions do
+                                for _, dispose in Map.toList model.Subscriptions do
                                     do! dispose.DisposeAsync()
 
                                 return initialModel

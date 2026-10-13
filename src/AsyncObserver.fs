@@ -2,6 +2,7 @@ namespace Fable.Reactive
 
 open System
 open Fable.Actor
+open Fable.Actor.Types
 open Fable.Reactive.Core
 
 type AsyncObserver<'T>(fn: Notification<'T> -> Async<unit>) =
@@ -24,6 +25,21 @@ type Observer<'T>(fn: Notification<'T> -> unit) =
 
 [<AutoOpen>]
 module AsyncObserver =
+    // decision: owns operator state in one actor so callbacks from different BEAM processes share ordered state
+    let internal statefulObserver (initial: 'State) (update: 'State -> Notification<'T> -> Async<'State>) =
+        let owner =
+            Actor.spawn (fun inbox ->
+                let rec loop state =
+                    actor {
+                        let! notification = inbox.Receive()
+                        let! next = update state notification
+                        return! loop next
+                    }
+
+                loop initial)
+
+        AsyncObserver.Create(fun notification -> async { owner.Post notification })
+
     type IAsyncObserver<'T> with
 
         /// Convert async observer (IAsyncObserver) to an observer (IObserver).
@@ -99,13 +115,16 @@ module AsyncObserver =
         : IAsyncObserver<'TSource> * (Async<IReactiveDisposable> -> Async<IReactiveDisposable>) =
         let agent =
             Actor.spawn (fun inbox ->
-                let rec messageLoop disposables =
+                let rec messageLoop disposables disposed =
                     actor {
-                        let! cmd = inbox.Receive()
+                        let! (cmd, reply: ReplyChannel<unit>) = inbox.Receive()
 
                         let! disposables' =
                             async {
                                 match cmd with
+                                | Disposable disp when disposed ->
+                                    do! disp.DisposeAsync()
+                                    return []
                                 | Disposable disp -> return disp :: disposables
                                 | Dispose ->
                                     for disp in disposables do
@@ -114,20 +133,31 @@ module AsyncObserver =
                                     return []
                             }
 
-                        return! messageLoop disposables'
+                        reply.Reply()
+
+                        return!
+                            messageLoop
+                                disposables'
+                                (disposed
+                                 || (match cmd with
+                                     | Dispose -> true
+                                     | _ -> false))
                     }
 
-                messageLoop [])
+                messageLoop [] false)
 
-        let cancel () = async { agent.Post Dispose }
+        let cancel () = Actor.asyncCall agent Dispose
+
         let safeObv = AsyncDisposable.Create cancel |> safeObserver obv
 
         // Auto-detaches (disposes) the disposable when the observer completes with success or error.
         // decision: registers subscriptions with an actor so terminal signals and explicit disposal serialize
+        // decision: queues registration without waiting so nested eager subscriptions cannot wait on their own cleanup
+        // invariant: subscriptions registered after termination are disposed instead of being retained
         let autoDetach (disposable: Async<IReactiveDisposable>) =
             async {
                 let! disp = disposable
-                agent.Post(Disposable disp)
+                Actor.cast agent (Disposable disp)
                 return disp
             }
 

@@ -8,6 +8,8 @@ open Fable.Reactive.Core
 [<RequireQualifiedAccess>]
 module internal ActorInterop =
 
+    type private SupervisorStop = SupervisorStop
+
     /// Wraps an Actor<Notification<'T>> as an IAsyncObserver<'T>.
     /// Posts each notification to the actor. The actor owns its own lifecycle.
     let toObserver (actor: Actor<Notification<'T>>) : IAsyncObserver<'T> =
@@ -40,89 +42,161 @@ module internal ActorInterop =
         : IAsyncObservable<'TResult> =
         let subscribeAsync (aobv: IAsyncObserver<'TResult>) =
             async {
-                let dispatch, stream = Subjects.subject<'TResult>()
-                let! innerDisp = stream.SubscribeAsync aobv
+                let closed = ActorLifetime.Flag(0)
+                let monitorFailed = ActorLifetime.Flag(0)
+                let childCancellation = new System.Threading.CancellationTokenSource()
+                let cleanupTimeout = 5000
+
+                let output =
+                    ActorLifetime.spawn None ignore (fun inbox ->
+                        let rec loop () =
+                            actor {
+                                let! value = inbox.Receive()
+
+                                if closed.Value = 0 then
+                                    try
+                                        do! aobv.OnNextAsync value
+                                    with ex ->
+                                        do! aobv.OnErrorAsync ex
+
+                                return! loop ()
+                            }
+
+                        loop ())
 
                 let emit value =
-                    dispatch.OnNextAsync value |> Async.Start'
+                    if closed.Value = 0 then
+                        output.Actor.Post value
 
-                // Nothing supervises the monitor, so downstream termination must not throw back into it.
-                // invariant: escalation attempts one terminal notification and never raises into the monitor
-                let escalate (ex: exn) =
+                // invariant: escalation never throws back into the unsupervised monitor
+                let escalate ex =
                     async {
-                        try
-                            do! aobv.OnErrorAsync ex
-                        with _ ->
-                            ()
+                        if closed.Value = 0 then
+                            try
+                                do! aobv.OnErrorAsync ex
+                            with _ ->
+                                ()
                     }
 
-                // Spawns and supervises the child, replaces it on Restart, and forwards upstream values.
-                //
-                // decision: multiplexes ChildExited and source values through Actor<obj> to serialize routing
-                // invariant: the current child is installed before the monitor dequeues an upstream value
-                // tradeoff: runtime casts buy one ordered mailbox for control signals and typed source values
                 let monitor =
-                    Actor.spawn (fun inbox ->
-                        // BEAM implements spawnLinked with spawn_link; trapping converts a child crash into a message.
-                        // decision: traps linked exits so the monitor, rather than the runtime, applies the decider
+                    ActorLifetime.spawn None (fun _ -> monitorFailed.Set 1) (fun inbox ->
                         Actor.trapExits ()
 
-                        let mutable child = Actor.spawnLinked (inbox.Reference, handler emit)
+                        let spawnChild () =
+                            ActorLifetime.spawnWithToken
+                                childCancellation.Token
+                                (Some inbox.Reference)
+                                (fun ex -> inbox.Post(box ({ Pid = null; Reason = box ex }: ChildExited)))
+                                (handler emit)
+
+                        let mutable child = spawnChild ()
 
                         let rec loop () =
                             actor {
                                 let! msg = inbox.Receive()
 
-                                // The monitor is the root of this local supervision tree.
-                                // decision: catches loop failures so an unsupervised monitor terminates downstream
-                                // invariant: monitor failure escalates and stops instead of leaving an unread mailbox
-                                let! alive =
-                                    actor {
-                                        try
-                                            match Actor.tryAsChildExited msg with
-                                            | Some exited ->
-                                                let ex =
-                                                    match exited.Reason with
-                                                    | :? exn as e -> e
-                                                    | r -> ProcessExitException(sprintf "%A" r)
+                                match msg with
+                                | :? SupervisorStop -> ()
+                                | _ when closed.Value <> 0 -> return! loop ()
+                                | _ ->
+                                    match Actor.tryAsChildExited msg with
+                                    | Some exited ->
+                                        let ex =
+                                            match exited.Reason with
+                                            | :? exn as e -> e
+                                            | r -> ProcessExitException(sprintf "%A" r)
 
-                                                match decide ex with
-                                                | Directive.Escalate -> do! escalate ex
-                                                | Directive.Stop -> ()
-                                                | Directive.Restart ->
-                                                    child <- Actor.spawnLinked (inbox.Reference, handler emit)
-                                            // Both backends normalize linked exits to ChildExited before this point.
-                                            // assumption: every other mailbox item is a boxed TSource value
-                                            | None -> child.Post(unbox<'TSource> msg)
+                                        match decide ex with
+                                        | Directive.Escalate -> do! escalate ex
+                                        | Directive.Stop -> return! loop ()
+                                        | Directive.Restart ->
+                                            do! child.Stop cleanupTimeout
 
-                                            return true
-                                        with ex ->
-                                            do! escalate ex
-                                            return false
-                                    }
+                                            if closed.Value = 0 then
+                                                child <- spawnChild ()
 
-                                if alive then
-                                    return! loop ()
+                                            return! loop ()
+                                    | None ->
+                                        child.Actor.Post(unbox<'TSource> msg)
+                                        return! loop ()
                             }
 
-                        loop ())
+                        actor {
+                            try
+                                do! loop ()
+                            with ex ->
+                                do! escalate ex
+
+                            try
+                                do! child.Stop cleanupTimeout
+                            with _ ->
+                                monitorFailed.Set 1
+                        })
+
+                let close () =
+                    closed.Set 1
+                    childCancellation.Cancel()
+
+                let stopMonitor () =
+                    async {
+                        monitor.Actor.Post(box SupervisorStop)
+
+                        try
+                            do!
+                                ActorLifetime.waitUntil
+                                    cleanupTimeout
+                                    "Supervisor did not acknowledge shutdown"
+                                    monitor.IsStopped
+                        with ex ->
+                            do! monitor.Stop cleanupTimeout
+                            return raise ex
+
+                        do! monitor.Stop cleanupTimeout
+
+                        if monitorFailed.Value <> 0 then
+                            failwith "Supervisor child cleanup failed"
+                    }
+
+                let cleanup (sourceDisp: IReactiveDisposable) () =
+                    ActorLifetime.cleanupAll
+                        [
+                            stopMonitor
+                            (fun () -> output.Stop cleanupTimeout)
+                            (fun () ->
+                                ActorLifetime.cleanupStep
+                                    cleanupTimeout
+                                    "Source disposal failed or timed out"
+                                    (sourceDisp.DisposeAsync()))
+                        ]
 
                 let obv =
                     { new IAsyncObserver<'TSource> with
-                        member _.OnNextAsync x = async { monitor.Post(box x) }
-                        member _.OnErrorAsync err = aobv.OnErrorAsync err
-                        member _.OnCompletedAsync() = aobv.OnCompletedAsync()
+                        member _.OnNextAsync x =
+                            async {
+                                if closed.Value = 0 then
+                                    monitor.Actor.Post(box x)
+                            }
+
+                        member _.OnErrorAsync err =
+                            async {
+                                if closed.Value = 0 then
+                                    do! aobv.OnErrorAsync err
+                            }
+
+                        member _.OnCompletedAsync() =
+                            async {
+                                if closed.Value = 0 then
+                                    do! aobv.OnCompletedAsync()
+                            }
                     }
 
-                let! sourceDisp = source.SubscribeAsync obv
-
-                return
-                    AsyncDisposable.Composite
-                        [
-                            sourceDisp
-                            innerDisp
-                            AsyncDisposable.Create(fun () -> async { Actor.kill monitor })
-                        ]
+                try
+                    let! sourceDisp = source.SubscribeAsync obv
+                    return ActorLifetime.disposable (cleanupTimeout * 4) close (cleanup sourceDisp)
+                with ex ->
+                    close ()
+                    do! cleanup AsyncDisposable.Empty ()
+                    return raise ex
             }
 
         { new IAsyncObservable<'TResult> with

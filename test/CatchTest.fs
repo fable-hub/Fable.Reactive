@@ -14,6 +14,21 @@ let tests =
         "Catch",
         [
             testAsync (
+                "catch forwards a throwing fallback handler as an error",
+                async {
+                    let failure = MyError "handler failed"
+
+                    let source =
+                        Reactive.fail<int>(MyError "source failed")
+                        |> Reactive.catch (fun _ -> raise failure)
+
+                    let observer = TestObserver<int>()
+                    let! _ = source.SubscribeAsync observer
+                    do! observer.AwaitIgnore()
+                    assertThat (observer.Notifications |> Seq.toList) (isEqualTo [ OnError failure ])
+                }
+            )
+            testAsync (
                 "catch no error",
                 async {
                     // Arrange
@@ -93,19 +108,15 @@ let tests =
                     // Arrange
                     let error = MyError "error"
                     let xs = fromNotification [ OnNext 1; OnError error ]
-                    let ys1 = fromNotification [ OnNext 2; OnError error ]
+                    let ys1 = fromNotification [ OnNext 2; OnError(MyError "fallback") ]
                     let ys2 = fromNotification [ OnNext 3; OnCompleted ]
-
-                    let iter =
-                        [ ys1; ys2 ]
-                        |> Seq.ofList
-                        |> fun x -> x.GetEnumerator()
 
                     let zs =
                         xs
-                        |> Reactive.catch (fun _ ->
-                            iter.MoveNext() |> ignore
-                            iter.Current)
+                        |> Reactive.catch (fun err ->
+                            match err with
+                            | MyError "fallback" -> ys2
+                            | _ -> ys1)
 
                     let obv = TestObserver<int>()
 

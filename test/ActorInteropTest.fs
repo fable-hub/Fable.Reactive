@@ -17,30 +17,23 @@ let tests =
                 "subscribeActor receives all notifications",
                 async {
                     let xs = fromNotification [ OnNext 1; OnNext 2; OnNext 3; OnCompleted ]
-                    let received = ResizeArray<Notification<int>>()
-                    let mutable completed = false
+                    let received = TestObserver<int>()
 
                     let actor =
                         Actor.spawn (fun inbox ->
                             let rec loop () =
                                 actor {
                                     let! msg = inbox.Receive()
-                                    received.Add msg
-
-                                    match msg with
-                                    | OnCompleted -> completed <- true
-                                    | OnError _ -> completed <- true
-                                    | _ -> ()
-
+                                    do! received.PostAsync msg
                                     return! loop ()
                                 }
 
                             loop ())
 
                     let! _sub = Reactive.subscribeActor actor xs
-                    do! waitUntil (fun () -> completed)
+                    do! received.AwaitIgnore()
 
-                    let actual = received |> Seq.toList
+                    let actual = received.Notifications |> Seq.toList
                     let expected = [ OnNext 1; OnNext 2; OnNext 3; OnCompleted ]
                     assertThat actual (isEqualTo expected)
                     Actor.kill actor
@@ -129,6 +122,44 @@ let tests =
                     do! subscription.DisposeAsync()
                 }
             )
+
+#if !FABLE_COMPILER
+            testAsync (
+                "flatMapActor disposal waits for receiving child cleanup",
+                async {
+                    let mutable upstream = Unchecked.defaultof<IAsyncObserver<int>>
+                    let mutable cleanupCount = 0
+
+                    let source =
+                        Reactive.create (fun observer ->
+                            async {
+                                upstream <- observer
+                                return AsyncDisposable.Empty
+                            })
+
+                    let result =
+                        source
+                        |> Reactive.flatMapActor (fun emit inbox ->
+                            actor {
+                                try
+                                    while true do
+                                        let! value = inbox.Receive()
+                                        emit value
+                                finally
+                                    System.Threading.Interlocked.Increment(&cleanupCount)
+                                    |> ignore
+                            })
+
+                    let observer = TestObserver<int>()
+                    let! subscription = result.SubscribeAsync observer
+                    do! upstream.OnNextAsync 42
+                    do! observer.WaitUntil(List.exists isOnNext)
+                    do! subscription.DisposeAsync()
+                    do! subscription.DisposeAsync()
+                    assertThat cleanupCount (isEqualTo 1)
+                }
+            )
+#endif
 
             testAsync (
                 "flatMapActorSupervised Stop continues stream after crash",
