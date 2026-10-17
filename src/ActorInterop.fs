@@ -225,16 +225,13 @@ module internal ActorInterop =
         let subscribeAsync (aobv: IAsyncObserver<'TResult>) =
             async {
                 let actor =
-                    Actor.spawn (fun inbox ->
-                        let rec loop state =
-                            actor {
-                                let! (value, rc: ReplyChannel<'TResult>) = inbox.Receive()
-                                let state', result = handler state value
-                                rc.Reply result
-                                return! loop state'
-                            }
-
-                        loop initialState)
+                    Actor.spawn (
+                        initialState,
+                        fun state (value, rc: ReplyChannel<'TResult>) ->
+                            let state', result = handler state value
+                            rc.Reply result
+                            state'
+                    )
 
                 let obv =
                     { new IAsyncObserver<'TSource> with
