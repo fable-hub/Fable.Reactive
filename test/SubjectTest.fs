@@ -149,5 +149,109 @@ let tests =
                     assertThat actual2 (isEqualTo [ OnError(TestExn()) ])
                 }
             )
+
+            testAsync (
+                "replay subject gives a late subscriber the last two values before live values",
+                async {
+                    let dispatch, stream = Reactive.replaySubject 2
+                    let first = TestObserver<char>()
+                    let late = TestObserver<char>()
+
+                    let! _ = stream.SubscribeAsync first
+                    do! dispatch.OnNextAsync 'a'
+                    do! dispatch.OnNextAsync 'b'
+                    do! dispatch.OnNextAsync 'c'
+                    do! first.WaitUntil(fun ns -> List.length ns = 3)
+
+                    let! _ = stream.SubscribeAsync late
+                    do! late.WaitUntil(fun ns -> List.length ns = 2)
+                    do! dispatch.OnNextAsync 'd'
+                    do! first.WaitUntil(fun ns -> List.length ns = 4)
+                    do! late.WaitUntil(fun ns -> List.length ns = 3)
+
+                    assertThat
+                        (List.ofSeq first.Notifications)
+                        (isEqualTo [ OnNext 'a'; OnNext 'b'; OnNext 'c'; OnNext 'd' ])
+
+                    assertThat (List.ofSeq late.Notifications) (isEqualTo [ OnNext 'b'; OnNext 'c'; OnNext 'd' ])
+                }
+            )
+
+            testAsync (
+                "replay subject replays values then completion to a late subscriber",
+                async {
+                    let dispatch, stream = Reactive.replaySubject 2
+                    let first = TestObserver<char>()
+                    let late = TestObserver<char>()
+
+                    let! _ = stream.SubscribeAsync first
+                    do! dispatch.OnNextAsync 'a'
+                    do! dispatch.OnNextAsync 'b'
+                    do! dispatch.OnNextAsync 'c'
+                    do! dispatch.OnCompletedAsync()
+                    do! dispatch.OnNextAsync 'd'
+
+                    do! first.AwaitIgnore()
+                    let! _ = stream.SubscribeAsync late
+                    do! late.AwaitIgnore()
+
+                    assertThat
+                        (List.ofSeq first.Notifications)
+                        (isEqualTo [ OnNext 'a'; OnNext 'b'; OnNext 'c'; OnCompleted ])
+
+                    assertThat (List.ofSeq late.Notifications) (isEqualTo [ OnNext 'b'; OnNext 'c'; OnCompleted ])
+                }
+            )
+
+            testAsync (
+                "replay subject replays values then error to a late subscriber",
+                async {
+                    let dispatch, stream = Reactive.replaySubject 1
+                    let error = TestExn()
+                    let late = TestObserver<int>()
+
+                    do! dispatch.OnNextAsync 1
+                    do! dispatch.OnNextAsync 2
+                    do! dispatch.OnErrorAsync error
+                    do! dispatch.OnCompletedAsync()
+
+                    let! _ = stream.SubscribeAsync late
+                    do! late.AwaitIgnore()
+
+                    assertThat (List.ofSeq late.Notifications) (isEqualTo [ OnNext 2; OnError error ])
+                }
+            )
+
+            testAsync (
+                "replay subject stops live delivery after disposal",
+                async {
+                    let dispatch, stream = Reactive.replaySubject 2
+                    let observer = TestObserver<int>()
+                    let! subscription = stream.SubscribeAsync observer
+
+                    do! dispatch.OnNextAsync 1
+                    do! observer.WaitUntil(fun ns -> List.length ns = 1)
+                    do! subscription.DisposeAsync()
+                    do! dispatch.OnNextAsync 2
+                    do! dispatch.OnCompletedAsync()
+                    do! observer.Refresh()
+
+                    assertThat (List.ofSeq observer.Notifications) (isEqualTo [ OnNext 1 ])
+                }
+            )
+
+            testAsync (
+                "replay subject rejects a non-positive buffer size",
+                async {
+                    let rejected =
+                        try
+                            Reactive.replaySubject<int> 0 |> ignore
+                            false
+                        with _ ->
+                            true
+
+                    assertThat rejected isTrue
+                }
+            )
         ]
     )
