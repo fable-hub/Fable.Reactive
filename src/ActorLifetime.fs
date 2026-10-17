@@ -64,34 +64,6 @@ module internal ActorLifetime =
                 do! Async.Sleep 5
         }
 
-    // decision: polls unique reply channels so disposal and actor death settle waits without a runtime call
-    // invariant: a deadline abandons only the reply wait and never retries or retracts the request
-    let reply<'T> () : ReplyChannel<'T> * (unit -> 'T option) =
-#if FABLE_COMPILER_BEAM
-        let caller: obj = emitErlExpr () "self()"
-        let reference: obj = emitErlExpr () "make_ref()"
-
-        let rc =
-            {
-                Reply = fun (value: 'T) -> emitErlExpr (caller, reference, value) "$0 ! {reactive_reply, $1, $2}, ok"
-            }
-
-        rc, (fun () -> emitErlExpr reference "receive {reactive_reply, $0, V} -> {some, V} after 0 -> undefined end")
-#else
-        let mutable result = None
-        let ready = Flag(0)
-
-        let rc =
-            {
-                Reply =
-                    fun value ->
-                        result <- Some value
-                        ready.Set 1
-            }
-
-        rc, (fun () -> if ready.Value = 1 then result else None)
-#endif
-
     type Worker<'T> =
         {
             Actor: Actor<'T>
