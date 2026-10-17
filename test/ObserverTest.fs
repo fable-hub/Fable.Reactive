@@ -173,7 +173,7 @@ let tests =
                 async {
                     // Arrange
                     let obv = TestObserver<int>()
-                    let mutable disposed = false
+                    let disposed = TestObserver<unit>()
 
                     let subscribeAsync (aobv: IAsyncObserver<int>) : Async<IReactiveDisposable> =
                         async {
@@ -184,7 +184,7 @@ let tests =
                                 }
 
                             Async.Start' worker
-                            let cancel () = async { disposed <- true }
+                            let cancel () = disposed.OnCompletedAsync()
                             return AsyncDisposable.Create cancel
                         }
 
@@ -199,14 +199,14 @@ let tests =
                     let! _dispose = xs.SubscribeAsync obv
                     do! obv.AwaitIgnore()
 
-                    // Give dispose logic a run on the loop.
-                    do! Async.Sleep 10
+                    // Observe cleanup across the actor boundary.
+                    do! disposed.AwaitIgnore()
 
                     // Assert
                     let actual = obv.Notifications |> Seq.toList
                     let expected = [ OnNext 1; OnNext 2; OnNext 3; OnNext 4; OnCompleted ]
 
-                    assertThat disposed isTrue
+                    assertThat (disposed.Notifications |> Seq.toList) (isEqualTo [ OnCompleted ])
                     assertThat actual (isEqualTo expected)
                 }
             )

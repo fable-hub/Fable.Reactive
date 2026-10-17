@@ -1,6 +1,7 @@
 namespace Fable.Reactive
 
 open System.Threading
+open Fable.Actor
 
 open Fable.Reactive.Core
 
@@ -141,7 +142,13 @@ module internal Create =
                             do! aobv.OnCompletedAsync()
                     }
 
+#if FABLE_COMPILER_BEAM
+                // decision: owns blocking BEAM sleeps in a worker process so subscription returns before the timer fires
+                Fable.Actor.Actor.spawn ((fun _ -> actor { do! handler msecs 0 }), cancellationToken = token)
+                |> ignore
+#else
                 Async.Start'(handler msecs 0, token)
+#endif
                 return cancel
             }
 

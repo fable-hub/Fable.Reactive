@@ -9,19 +9,13 @@ open Fable.Reactive.Core
 ///
 /// invariant: each AsyncDisposable instance invokes its cancellation callback no more than once
 type AsyncDisposable private (cancel) =
-    let mutable isDisposed = 0
+    let tryDispose = disposalGate ()
 
     interface IReactiveDisposable with
         member this.DisposeAsync() =
             async {
-#if FABLE_COMPILER
-                if isDisposed = 0 then
-                    isDisposed <- 1
+                if tryDispose () then
                     do! cancel ()
-#else
-                if System.Threading.Interlocked.Exchange(&isDisposed, 1) = 0 then
-                    do! cancel ()
-#endif
             }
 
     static member Create cancel : IReactiveDisposable =
@@ -42,18 +36,12 @@ type AsyncDisposable private (cancel) =
 
 type Disposable(cancel) =
     // invariant: each Disposable instance invokes its cancellation callback no more than once
-    let mutable isDisposed = 0
+    let tryDispose = disposalGate ()
 
     interface IDisposable with
         member this.Dispose() =
-#if FABLE_COMPILER
-            if isDisposed = 0 then
-                isDisposed <- 1
+            if tryDispose () then
                 cancel ()
-#else
-            if System.Threading.Interlocked.Exchange(&isDisposed, 1) = 0 then
-                cancel ()
-#endif
 
     static member Create(cancel) : IDisposable = new Disposable(cancel) :> IDisposable
 

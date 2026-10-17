@@ -93,37 +93,35 @@ Scriptorium is Fable-compatible, so this one suite compiles and runs on every Fa
 just .NET. Quill knows how to end the process on each platform.
 
 ```bash
-just test          # .NET — the green gate
+just test          # .NET suite
 just test-js       # JS via Node
 just test-python   # Python via uv
 just test-beam     # Erlang via rebar3 + erl
 just test-all      # all four; exits non-zero while any target fails
 ```
 
-Runtime baseline measured on 2026-10-03 at `896fc24`, before subsequent test additions:
+CI executes the shared Scriptorium suite on .NET, JavaScript, Python, and BEAM.
+Every target is a required runtime gate; successful Fable compilation alone is insufficient.
+The Fable builds exclude the seven .NET-only AsyncSeq integration tests.
+
+Runtime results measured on 2026-10-17 with Fable 5.22.0 and Fable.Actor 5.0.0-rc.18:
 
 | Target | Passed | Failed | Total |
 | ------ | ------ | ------ | ----- |
-| .NET | 94 | 0 | 94 |
-| JavaScript | 90 | 2 | 92 |
-| Python | 88 | 4 | 92 |
-| BEAM | 21 | 71 | 92 |
+| .NET | 111 | 0 | 111 |
+| JavaScript | 104 | 0 | 104 |
+| Python | 104 | 0 | 104 |
+| BEAM | 104 | 0 | 104 |
 
-Keep measured pass counts here only; recipes and CI refer to this baseline. Cross-target runtime
-suites are diagnostic sweeps, while CI gates the .NET suite and compilation of each Fable target.
+Fable 5.22.0 includes the BEAM lazy-sequence portability fix. Direct merge, concat, and
+mapped-sequence actor tests now run against the published runtime without deferred rebuilding.
+There are no skipped tests or allowed-failure jobs.
 
 Use the `fable` tool pinned in `.config/dotnet-tools.json`, restored with `just restore`.
 The recipes export `FableCompile=true`, which drops the .NET-only
 `extra/AsyncSeq` project and `AsyncSeqTest.fs` from Fable builds — MSBuild reads environment
 variables as global properties, which is the only way to get a property into the design-time build
 Fable runs internally.
-
-The remaining Fable-target failures include runtime gaps and target-specific test limitations. Several trace
-to `Async.Start'` in `src/Core.fs`, which is `Async.StartImmediate` under `FABLE_COMPILER` and
-`Async.Start` on .NET: work that runs inline cannot be cancelled by a later `DisposeAsync`, and
-eager emissions can outrun a subscription. On BEAM, terminal notifications don't reach the observer
-reliably, causing many `Await`/`AwaitIgnore` calls to reach Quill's 5s timeout. Some BEAM tests
-also rely on shared mutable state across actors, which cannot work across BEAM process boundaries.
 
 The Python recipe uses `uv run --with fable-library` as a standalone execution environment.
 The obsolete Poetry manifest for the former package name is removed, so uv no longer needs

@@ -60,3 +60,26 @@ FSharp.Control.Reactive or System.Reactive.
 These adapters are the existing integration boundary; there are no automatic replacements for
 the other library's operators. Further integration should specify the conversion direction, target support,
 notification ordering, and disposal behavior it needs.
+
+## Lazy sequences on BEAM
+
+Fable 5.21.0 stores lazy sequence wrappers in the creating process's dictionary. Passing an already-created
+lazy sequence to `Reactive.ofSeq` can therefore fail when an operator subscribes from another actor.
+Immutable F# lists do not have this limitation.
+
+Until Fable's sequence runtime fix is released, create the sequence inside `Reactive.defer`:
+
+```fsharp
+// TODO(upstream): remove this mitigation once the pinned Fable runtime passes the direct
+// cross-process lazy-sequence merge/concat tests without a patched sequence runtime.
+let source =
+    Reactive.defer (fun () ->
+        seq { 1..10 }
+        |> Seq.map (fun value -> value * 2)
+        |> Reactive.ofSeq)
+```
+
+This creates a fresh sequence in each subscribing process and preserves lazy enumeration. Build the entire
+sequence expression inside the factory; closing over a lazy sequence created outside it keeps the same
+process-local reference. This mitigation relies on the current BEAM worker running inline in its subscribing
+process. The direct cross-process `ofSeq` regression tests remain enabled until the upstream runtime is fixed.

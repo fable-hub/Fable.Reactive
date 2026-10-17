@@ -71,10 +71,10 @@ shipit *args:
 #
 # Cross-target runtime baselines and known gaps are documented in CLAUDE.md.
 
-# Run the .NET suite — the green gate
+# Run the .NET suite
 test: test-native
 
-# Run the suite on every target (cross-target sweep; not all green yet)
+# Run all required CI runtime suites; any target failure is an error
 test-all: test-native test-js test-python test-beam
 
 # .NET target

@@ -61,7 +61,7 @@ type ITestObserver<'a> =
     abstract AwaitIgnore: unit -> Async<unit>
 
 /// Cross-target test observer. All state is owned by a single actor and accessed
-/// only via messages (post + callAsync query) — never shared mutable memory —
+/// only via messages (post + asyncCall query) — never shared mutable memory —
 /// which is required on BEAM, where `safeObserver` delivers from a spawned
 /// process whose mutations another process cannot see.
 ///
@@ -114,7 +114,7 @@ let TestObserver<'a> () : ITestObserver<'a> =
     let awaitSnapshot () =
         let rec loop () =
             async {
-                let! snap = Actor.callAsync store Get
+                let! snap = Actor.asyncCall store Get
 
                 if snap.Completed then
                     cached <- ResizeArray(snap.Notifications)
@@ -138,7 +138,7 @@ let TestObserver<'a> () : ITestObserver<'a> =
         /// streams that never complete (e.g. disposed before a terminal event).
         member _.Refresh() =
             async {
-                let! snap = Actor.callAsync store Get
+                let! snap = Actor.asyncCall store Get
                 cached <- ResizeArray(snap.Notifications)
             }
 
@@ -151,7 +151,7 @@ let TestObserver<'a> () : ITestObserver<'a> =
         member _.WaitUntil(predicate) =
             let rec loop () =
                 async {
-                    let! snap = Actor.callAsync store Get
+                    let! snap = Actor.asyncCall store Get
                     cached <- ResizeArray(snap.Notifications)
 
                     if predicate snap.Notifications then

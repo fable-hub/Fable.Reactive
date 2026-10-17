@@ -33,6 +33,7 @@ let main _argv =
             Tests.Query.tests
             Tests.Catch.tests
             Tests.Scan.tests
+            Tests.Stateful.tests
             Tests.SubjectTest.tests
             Tests.TakeUntil.tests
 #if !FABLE_COMPILER

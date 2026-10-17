@@ -12,27 +12,17 @@ module Reactive =
             let cancel, token = canceller ()
 
             async {
-                let ie = xs.GetEnumerator()
-
-                let rec loop () =
+                // decision: uses public AsyncSeq iteration so the library owns enumerator cleanup across API versions
+                let loop () =
                     async {
                         let! result =
-                            async {
-                                try
-                                    let! value = ie.MoveNext()
-                                    return Ok value
-                                with ex ->
-                                    return Error ex
-                            }
+                            xs
+                            |> AsyncSeq.iterAsync aobv.OnNextAsync
+                            |> Async.Catch
 
                         match result with
-                        | Ok notification ->
-                            match notification with
-                            | Some x ->
-                                do! aobv.OnNextAsync x
-                                do! loop ()
-                            | None -> do! aobv.OnCompletedAsync()
-                        | Error err -> do! aobv.OnErrorAsync err
+                        | Choice1Of2() -> do! aobv.OnCompletedAsync()
+                        | Choice2Of2 err -> do! aobv.OnErrorAsync err
                     }
 
                 Async.StartImmediate(loop (), token)
@@ -40,7 +30,8 @@ module Reactive =
             }
 
         { new IAsyncObservable<'TSource> with
-            member __.SubscribeAsync o = subscribeAsync o }
+            member __.SubscribeAsync o = subscribeAsync o
+        }
 
 
     /// Convert async observable to async sequence, non-blocking. Producer will be awaited until item is consumed by the
