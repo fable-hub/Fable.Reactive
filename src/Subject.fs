@@ -159,3 +159,108 @@ module internal Subjects =
             }
 
         obv, obs
+
+    type private ReplaySubjectMsg<'T> =
+        | AddReplay of IAsyncObserver<'T>
+        | RemoveReplay of int
+        | BroadcastReplay of Notification<'T>
+
+    /// Replays the most recent values to each new subscriber, then forwards live notifications.
+    /// Late subscribers also receive the terminal notification after the retained values.
+    ///
+    /// decision: keeps subscribers, retained values, and terminal state in one actor to order replay before live delivery
+    /// invariant: the buffer contains at most bufferSize values, newest first, and never changes after termination
+    /// invariant: a completed OnNextAsync updates the buffer before a subsequent SubscribeAsync reads it
+    let replaySubject<'TSource> (bufferSize: int) : IAsyncObserver<'TSource> * IAsyncObservable<'TSource> =
+        if bufferSize < 1 then
+            invalidArg (nameof bufferSize) "Buffer size must be at least one."
+
+        let deliver (obv: IAsyncObserver<'TSource>) (notification: Notification<'TSource>) =
+            match notification with
+            | OnNext value -> obv.OnNextAsync value
+            | OnError error -> obv.OnErrorAsync error
+            | OnCompleted -> obv.OnCompletedAsync()
+
+        let owner =
+            Actor.spawn (fun inbox ->
+                let rec loop
+                    (subscribers: (int * IAsyncObserver<'TSource>) list)
+                    nextId
+                    (buffer: 'TSource list)
+                    (terminal: Notification<'TSource> option)
+                    =
+                    actor {
+                        let! (cmd, reply: ReplyChannel<int option>) = inbox.Receive()
+
+                        match cmd with
+                        | AddReplay obv ->
+                            for value in List.rev buffer do
+                                do! obv.OnNextAsync value
+
+                            match terminal with
+                            | Some notification ->
+                                do! deliver obv notification
+                                reply.Reply None
+                                return! loop subscribers nextId buffer terminal
+                            | None ->
+                                reply.Reply(Some nextId)
+                                return! loop (subscribers @ [ nextId, obv ]) (nextId + 1) buffer terminal
+                        | RemoveReplay id ->
+                            reply.Reply None
+
+                            return!
+                                loop
+                                    (subscribers
+                                     |> List.filter (fun (key, _) -> key <> id))
+                                    nextId
+                                    buffer
+                                    terminal
+                        | BroadcastReplay notification ->
+                            match terminal with
+                            | Some _ ->
+                                reply.Reply None
+                                return! loop subscribers nextId buffer terminal
+                            | None ->
+                                for _, obv in subscribers do
+                                    do! deliver obv notification
+
+                                reply.Reply None
+
+                                match notification with
+                                | OnNext value ->
+                                    return! loop subscribers nextId (List.truncate bufferSize (value :: buffer)) None
+                                | OnError _
+                                | OnCompleted -> return! loop [] nextId buffer (Some notification)
+                    }
+
+                loop [] 0 [] None)
+
+        let subscribeAsync (aobv: IAsyncObserver<'TSource>) : Async<IReactiveDisposable> =
+            async {
+                let sobv = safeObserver aobv AsyncDisposable.Empty
+                let! id = Actor.asyncCall owner (AddReplay sobv)
+
+                let cancel () =
+                    async {
+                        match id with
+                        | Some key ->
+                            let! _ = Actor.asyncCall owner (RemoveReplay key)
+                            return ()
+                        | None -> return ()
+                    }
+
+                return AsyncDisposable.Create cancel
+            }
+
+        let post notification =
+            async {
+                let! _ = Actor.asyncCall owner (BroadcastReplay notification)
+                return ()
+            }
+
+        let observer = AsyncObserver post :> IAsyncObserver<'TSource>
+
+        observer,
+        { new IAsyncObservable<'TSource> with
+            member _.SubscribeAsync obv = subscribeAsync obv
+        }
