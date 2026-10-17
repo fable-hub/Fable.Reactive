@@ -1,11 +1,24 @@
 ---
-last_commit_released: b449860886f32c90c4369842dd275bb0f80fded9
+last_commit_released: 8314bf23c691a501e6782a98deeb0a461095f7c6
 name: Fable.Reactive
 ---
 
 # Changelog
 
 All notable changes to this project will be documented in this file.
+
+## 1.0.0-rc.9 - 2026-10-17
+
+### 🚀 Features
+
+* Add pipe-friendly subscribeAsync (#42) ([2f317a7](https://github.com/fable-hub/Fable.Reactive/commit/2f317a7f03bf32e7f62c8c13dbeff4a981538f24))
+* Add replay subject (#50) ([8314bf2](https://github.com/fable-hub/Fable.Reactive/commit/8314bf23c691a501e6782a98deeb0a461095f7c6))
+
+### 🐞 Bug Fixes
+
+* Restore cross-target subscriptions and actor compatibility (#48) ([cae523a](https://github.com/fable-hub/Fable.Reactive/commit/cae523ad0289ae417a2702ce46bb5edf5131226a))
+
+<strong><small>[View changes on Github](https://github.com/fable-hub/Fable.Reactive/compare/b449860886f32c90c4369842dd275bb0f80fded9..8314bf23c691a501e6782a98deeb0a461095f7c6)</small></strong>
 
 ## 1.0.0-rc.8 - 2026-10-03
 
