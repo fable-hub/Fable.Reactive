@@ -12,17 +12,17 @@ let tests =
         "Stateful",
         [
             testAsync (
-                "deferred lazy sequences support actor subscriptions and resubscription",
+                "mapped lazy sequences support actor subscriptions and resubscription",
                 async {
+                    // invariant: the same lazy wrapper crosses actor processes without rebuilding it per subscription
+                    let inner =
+                        seq { 1..3 }
+                        |> Seq.map (fun value -> value * 2)
+                        |> Reactive.ofSeq
+
                     let source =
                         Reactive.single ()
-                        |> Reactive.flatMap (fun () ->
-                            // TODO(upstream): remove this BEAM mitigation coverage when the pinned Fable runtime
-                            // passes the direct cross-process lazy-sequence merge/concat tests without overrides.
-                            Reactive.defer (fun () ->
-                                seq { 1..3 }
-                                |> Seq.map (fun value -> value * 2)
-                                |> Reactive.ofSeq))
+                        |> Reactive.flatMap (fun () -> inner)
 
                     let first = TestObserver<int>()
                     let second = TestObserver<int>()

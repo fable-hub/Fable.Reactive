@@ -104,23 +104,18 @@ CI executes the shared Scriptorium suite on .NET, JavaScript, Python, and BEAM.
 Every target is a required runtime gate; successful Fable compilation alone is insufficient.
 The Fable builds exclude the seven .NET-only AsyncSeq integration tests.
 
-Runtime results measured on 2026-10-14 with Fable 5.21.0 and Fable.Actor 5.0.0-rc.17:
+Runtime results measured on 2026-10-17 with Fable 5.22.0 and Fable.Actor 5.0.0-rc.18:
 
 | Target | Passed | Failed | Total |
 | ------ | ------ | ------ | ----- |
 | .NET | 111 | 0 | 111 |
 | JavaScript | 104 | 0 | 104 |
 | Python | 104 | 0 | 104 |
-| BEAM (published runtime) | 96 | 8 | 104 |
-| BEAM (sequence runtime fix) | 104 | 0 | 104 |
+| BEAM | 104 | 0 | 104 |
 
-The eight published BEAM runtime failures are merge/concat cases that pass lazy sequences
-between processes. Fable's `SeqModule.Enumerator.Enumerable` wrapper is represented by a
-process-local reference because `ToString` calls its own interface method. Calling the stored
-factory directly preserves formatting behavior and permits an immutable, process-portable
-wrapper. This fix belongs in Fable's shared `src/fable-library-ts/Seq.fs`, followed by rebuilding
-and publishing the BEAM runtime. CI's BEAM job remains red until that corrected runtime is pinned;
-there are no skipped tests or allowed-failure jobs.
+Fable 5.22.0 includes the BEAM lazy-sequence portability fix. Direct merge, concat, and
+mapped-sequence actor tests now run against the published runtime without deferred rebuilding.
+There are no skipped tests or allowed-failure jobs.
 
 Use the `fable` tool pinned in `.config/dotnet-tools.json`, restored with `just restore`.
 The recipes export `FableCompile=true`, which drops the .NET-only
