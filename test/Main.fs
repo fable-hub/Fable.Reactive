@@ -42,6 +42,7 @@ let main _argv =
             Tests.Timeshift.tests
             Tests.Debounce.tests
             Tests.ActorInterop.tests
+            Tests.SupervisedPayload.tests
             Tests.Probe.tests
         ]
     )

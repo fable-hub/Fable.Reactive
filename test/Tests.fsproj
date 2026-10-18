@@ -27,6 +27,7 @@
     <Compile Include="TimeshiftTest.fs" />
     <Compile Include="DebounceTest.fs" />
     <Compile Include="ActorInteropTest.fs" />
+    <Compile Include="SupervisedPayloadTest.fs" />
 
     <Compile Include="ProbeTest.fs" />
     <Compile Include="Main.fs" />

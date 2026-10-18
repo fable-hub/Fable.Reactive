@@ -10,6 +10,10 @@ module internal ActorInterop =
 
     type private SupervisorStop = SupervisorStop
 
+    // decision: tags forwarded values before the shared monitor sees them so BEAM never tests user records as child exits
+    // invariant: the monitor classifies only the outer envelope and never inspects a source value for exit markers
+    type private ForwardedValue = ReactiveForwardedValue of obj
+
     /// Wraps an Actor<Notification<'T>> as an IAsyncObserver<'T>.
     /// Posts each notification to the actor. The actor owns its own lifecycle.
     let toObserver (actor: Actor<Notification<'T>>) : IAsyncObserver<'T> =
@@ -98,6 +102,10 @@ module internal ActorInterop =
                                 match msg with
                                 | :? SupervisorStop -> ()
                                 | _ when closed.Value <> 0 -> return! loop ()
+                                | :? ForwardedValue as forwarded ->
+                                    let (ReactiveForwardedValue value) = forwarded
+                                    child.Actor.Post(unbox<'TSource> value)
+                                    return! loop ()
                                 | _ ->
                                     match Actor.tryAsChildExited msg with
                                     | Some exited ->
@@ -116,9 +124,7 @@ module internal ActorInterop =
                                                 child <- spawnChild ()
 
                                             return! loop ()
-                                    | None ->
-                                        child.Actor.Post(unbox<'TSource> msg)
-                                        return! loop ()
+                                    | None -> failwith "Unexpected supervised actor message"
                             }
 
                         actor {
@@ -157,7 +163,8 @@ module internal ActorInterop =
                             failwith "Supervisor child cleanup failed"
                     }
 
-                let cleanup (sourceDisp: IReactiveDisposable) () =
+                // decision: passes an explicit unit closure to disposal so Python does not call a partially applied function
+                let cleanup (sourceDisp: IReactiveDisposable) =
                     ActorLifetime.cleanupAll
                         [
                             stopMonitor
@@ -174,7 +181,7 @@ module internal ActorInterop =
                         member _.OnNextAsync x =
                             async {
                                 if closed.Value = 0 then
-                                    monitor.Actor.Post(box x)
+                                    monitor.Actor.Post(box (ReactiveForwardedValue(box x)))
                             }
 
                         member _.OnErrorAsync err =
@@ -192,10 +199,10 @@ module internal ActorInterop =
 
                 try
                     let! sourceDisp = source.SubscribeAsync obv
-                    return ActorLifetime.disposable (cleanupTimeout * 4) close (cleanup sourceDisp)
+                    return ActorLifetime.disposable (cleanupTimeout * 4) close (fun () -> cleanup sourceDisp)
                 with ex ->
                     close ()
-                    do! cleanup AsyncDisposable.Empty ()
+                    do! cleanup AsyncDisposable.Empty
                     return raise ex
             }
 
