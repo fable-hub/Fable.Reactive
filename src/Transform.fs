@@ -199,8 +199,8 @@ module internal Transform =
     ///
     /// decision: serializes fallback subscription and disposal so eager sources cannot overwrite the current subscription
     /// invariant: disposal acknowledges cleanup of the current subscription and rejects later notifications
-    let catch
-        (handler: exn -> IAsyncObservable<'TSource>)
+    let private catchWith
+        (handler: int -> exn -> IAsyncObservable<'TSource> option)
         (source: IAsyncObservable<'TSource>)
         : IAsyncObservable<'TSource> =
         let subscribeAsync (aobv: IAsyncObserver<'TSource>) =
@@ -237,10 +237,15 @@ module internal Transform =
                                     let! next =
                                         async {
                                             try
-                                                let! subscription =
-                                                    (handler err).SubscribeAsync(observer (generation + 1))
+                                                match handler generation err with
+                                                | Some fallback ->
+                                                    let! subscription =
+                                                        fallback.SubscribeAsync(observer (generation + 1))
 
-                                                return Some subscription
+                                                    return Some subscription
+                                                | None ->
+                                                    do! safeObv.OnErrorAsync err
+                                                    return None
                                             with failure ->
                                                 do! safeObv.OnErrorAsync failure
                                                 return None
@@ -273,17 +278,22 @@ module internal Transform =
             member _.SubscribeAsync o = subscribeAsync o
         }
 
+    let catch
+        (handler: exn -> IAsyncObservable<'TSource>)
+        (source: IAsyncObservable<'TSource>)
+        : IAsyncObservable<'TSource> =
+        catchWith (fun _ err -> Some(handler err)) source
+
+    // decision: derives the retry budget from the catch actor's generation so BEAM never shares mutable state
+    // invariant: an exhausted nonnegative budget forwards the source error without subscribing again
     let retry (retryCount: int) (source: IAsyncObservable<'TSource>) =
-        let mutable count = retryCount
-
-        let factory exn =
-            match count with
-            | 0 -> Create.fail exn
-            | _ ->
-                count <- count - 1
-                source
-
-        catch factory source
+        catchWith
+            (fun generation _ ->
+                if retryCount < 0 || generation < retryCount then
+                    Some source
+                else
+                    None)
+            source
 
     type Cmd =
         | Connect

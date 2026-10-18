@@ -45,18 +45,17 @@ All sub-namespaces and modules have been renamed accordingly:
 
 ## Documentation
 
-Documentation is currently being updated.
-
-See [Interoperability with .NET Reactive Extensions](docs/INTEROPERABILITY.md) for existing
-observable, observer, and subscription adapters and their asynchronous execution boundaries.
-
-### takeUntil ordering
-
-`Reactive.takeUntil notifier source` stops forwarding source values when it observes a notifier value.
-The two subscriptions deliver independently, so source values still in flight may be dropped when the
-notifier stops the stream. Posting source values before a notifier value, even with sequential
-`do! sourceObserver.OnNextAsync ...` calls, does not guarantee that downstream has received them.
-When that ordering matters, arrange downstream acknowledgement before triggering the notifier.
+- [Getting started](docs/getting-started.md): subscribe, handle notifications, and dispose
+- [Creating streams](docs/creating.md): values, workflows, and subjects
+- [Filtering](docs/filtering.md): select, limit, and stop values
+- [Transforming](docs/transforming.md): map values and switch or flatten streams
+- [Combining](docs/combining.md): concatenate, merge, and pair streams
+- [Aggregating](docs/aggregating.md): running state, final results, and groups
+- [Error handling](docs/error-handling.md): failures, fallback streams, and retries
+- [Time shifting](docs/time-shifting.md): timers, delays, debounce, and sampling
+- [Reactive builder](docs/builder.md): write streams with `reactive { ... }`
+- [Actor interoperability](docs/actor-interop.md): subscribe actors and build actor-backed streams
+- [Interoperability with .NET Reactive Extensions](docs/INTEROPERABILITY.md): adapters and their execution boundaries
 
 ## Install
 

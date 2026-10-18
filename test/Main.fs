@@ -32,6 +32,7 @@ let main _argv =
             Tests.Bind.tests
             Tests.Query.tests
             Tests.Catch.tests
+            Tests.Retry.tests
             Tests.Scan.tests
             Tests.Stateful.tests
             Tests.SubjectTest.tests
