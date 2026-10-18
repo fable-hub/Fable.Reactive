@@ -1,11 +1,20 @@
 ---
-last_commit_released: 8314bf23c691a501e6782a98deeb0a461095f7c6
+last_commit_released: d54c27ae6e3b10a733c20546b1f7336b434d7e2d
 name: Fable.Reactive
 ---
 
 # Changelog
 
 All notable changes to this project will be documented in this file.
+
+## 1.0.0-rc.10 - 2026-10-18
+
+### 🐞 Bug Fixes
+
+* Preserve supervised values shaped like child exits (#51) ([3364e37](https://github.com/fable-hub/Fable.Reactive/commit/3364e37ebcb48f21e6fcc4ffebcd609821581e29))
+* Correct retry and add Reactive guides (#53) ([d54c27a](https://github.com/fable-hub/Fable.Reactive/commit/d54c27ae6e3b10a733c20546b1f7336b434d7e2d))
+
+<strong><small>[View changes on Github](https://github.com/fable-hub/Fable.Reactive/compare/8314bf23c691a501e6782a98deeb0a461095f7c6..d54c27ae6e3b10a733c20546b1f7336b434d7e2d)</small></strong>
 
 ## 1.0.0-rc.9 - 2026-10-17
 
