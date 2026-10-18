@@ -104,14 +104,14 @@ CI executes the shared Scriptorium suite on .NET, JavaScript, Python, and BEAM.
 Every target is a required runtime gate; successful Fable compilation alone is insufficient.
 The Fable builds exclude the seven .NET-only AsyncSeq integration tests.
 
-Runtime results measured on 2026-10-17 with Fable 5.22.0 and Fable.Actor 5.0.0-rc.18:
+Runtime results measured on 2026-10-18 with Fable 5.22.0 and Fable.Actor 5.0.0-rc.18:
 
 | Target | Passed | Failed | Total |
 | ------ | ------ | ------ | ----- |
-| .NET | 111 | 0 | 111 |
-| JavaScript | 104 | 0 | 104 |
-| Python | 104 | 0 | 104 |
-| BEAM | 104 | 0 | 104 |
+| .NET | 119 | 0 | 119 |
+| JavaScript | 112 | 0 | 112 |
+| Python | 112 | 0 | 112 |
+| BEAM | 112 | 0 | 112 |
 
 Fable 5.22.0 includes the BEAM lazy-sequence portability fix. Direct merge, concat, and
 mapped-sequence actor tests now run against the published runtime without deferred rebuilding.
