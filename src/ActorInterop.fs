@@ -28,6 +28,195 @@ module internal ActorInterop =
     let subscribeActor (actor: Actor<Notification<'T>>) (source: IAsyncObservable<'T>) : Async<IReactiveDisposable> =
         source.SubscribeAsync(toObserver actor)
 
+    let private cleanupTimeout = 5000
+
+    type private SupervisedContext<'TSource, 'TResult> =
+        {
+            Closed: ActorLifetime.Flag
+            MonitorFailed: ActorLifetime.Flag
+            ChildCancellation: System.Threading.CancellationTokenSource
+            Output: ActorLifetime.Worker<'TResult>
+            Downstream: IAsyncObserver<'TResult>
+            Decide: exn -> Directive
+            Handler: ('TResult -> unit) -> ActorInbox<'TSource> -> ActorOp<unit>
+        }
+
+    let private spawnOutput (closed: ActorLifetime.Flag) (downstream: IAsyncObserver<'T>) =
+        ActorLifetime.spawn None ignore (fun inbox ->
+            let rec loop () =
+                actor {
+                    let! value = inbox.Receive()
+
+                    if closed.Value = 0 then
+                        try
+                            do! downstream.OnNextAsync value
+                        with ex ->
+                            do! downstream.OnErrorAsync ex
+
+                    return! loop ()
+                }
+
+            loop ())
+
+    // invariant: escalation never throws back into the unsupervised monitor
+    let private escalate (context: SupervisedContext<_, _>) ex =
+        async {
+            if context.Closed.Value = 0 then
+                try
+                    do! context.Downstream.OnErrorAsync ex
+                with _ ->
+                    ()
+        }
+
+    let private childExitError (exited: ChildExited) =
+        match exited.Reason with
+        | :? exn as ex -> ex
+        | reason -> ProcessExitException(sprintf "%A" reason)
+
+    let private handleChildExit
+        (context: SupervisedContext<'TSource, 'TResult>)
+        (spawnChild: unit -> ActorLifetime.Worker<'TSource>)
+        (child: ActorLifetime.Worker<'TSource>)
+        (exited: ChildExited)
+        : ActorOp<ActorLifetime.Worker<'TSource> option> =
+        actor {
+            let ex = childExitError exited
+
+            match context.Decide ex with
+            | Directive.Escalate ->
+                do! escalate context ex
+                return None
+            | Directive.Stop -> return Some child
+            | Directive.Restart ->
+                do! child.Stop cleanupTimeout
+
+                if context.Closed.Value = 0 then
+                    return Some(spawnChild ())
+                else
+                    return Some child
+        }
+
+    let private routeMonitorMessage
+        (context: SupervisedContext<'TSource, 'TResult>)
+        (spawnChild: unit -> ActorLifetime.Worker<'TSource>)
+        (child: ActorLifetime.Worker<'TSource>)
+        (msg: obj)
+        : ActorOp<ActorLifetime.Worker<'TSource> option> =
+        actor {
+            match msg with
+            | :? SupervisorStop -> return None
+            | _ when context.Closed.Value <> 0 -> return Some child
+            | :? ForwardedValue as forwarded ->
+                let (ReactiveForwardedValue value) = forwarded
+                child.Actor.Post(unbox<'TSource> value)
+                return Some child
+            | _ ->
+                match Actor.tryAsChildExited msg with
+                | Some exited -> return! handleChildExit context spawnChild child exited
+                | None -> return failwith "Unexpected supervised actor message"
+        }
+
+    let private startSupervisedMonitor (context: SupervisedContext<'TSource, 'TResult>) =
+        ActorLifetime.spawn None (fun _ -> context.MonitorFailed.Set 1) (fun inbox ->
+            Actor.trapExits ()
+
+            let emit value =
+                if context.Closed.Value = 0 then
+                    context.Output.Actor.Post value
+
+            let spawnChild () =
+                ActorLifetime.spawnWithToken
+                    context.ChildCancellation.Token
+                    (Some inbox.Reference)
+                    (fun ex -> inbox.Post(box ({ Pid = null; Reason = box ex }: ChildExited)))
+                    (context.Handler emit)
+
+            let mutable child = spawnChild ()
+
+            let rec loop () =
+                actor {
+                    let! msg = inbox.Receive()
+                    let! nextChild = routeMonitorMessage context spawnChild child msg
+
+                    match nextChild with
+                    | None -> ()
+                    | Some next ->
+                        child <- next
+                        return! loop ()
+                }
+
+            actor {
+                try
+                    do! loop ()
+                with ex ->
+                    do! escalate context ex
+
+                try
+                    do! child.Stop cleanupTimeout
+                with _ ->
+                    context.MonitorFailed.Set 1
+            })
+
+    let private closeSupervision (context: SupervisedContext<_, _>) =
+        context.Closed.Set 1
+        context.ChildCancellation.Cancel()
+
+    let private stopMonitor (context: SupervisedContext<_, _>) (monitor: ActorLifetime.Worker<obj>) =
+        async {
+            monitor.Actor.Post(box SupervisorStop)
+
+            try
+                do! ActorLifetime.waitUntil cleanupTimeout "Supervisor did not acknowledge shutdown" monitor.IsStopped
+            with ex ->
+                do! monitor.Stop cleanupTimeout
+                return raise ex
+
+            do! monitor.Stop cleanupTimeout
+
+            if context.MonitorFailed.Value <> 0 then
+                failwith "Supervisor child cleanup failed"
+        }
+
+    let private cleanupSupervision
+        (context: SupervisedContext<_, _>)
+        (monitor: ActorLifetime.Worker<obj>)
+        (sourceDisp: IReactiveDisposable)
+        =
+        ActorLifetime.cleanupAll
+            [
+                (fun () -> stopMonitor context monitor)
+                (fun () -> context.Output.Stop cleanupTimeout)
+                (fun () ->
+                    ActorLifetime.cleanupStep
+                        cleanupTimeout
+                        "Source disposal failed or timed out"
+                        (sourceDisp.DisposeAsync()))
+            ]
+
+    let private supervisedObserver
+        (context: SupervisedContext<'TSource, 'TResult>)
+        (monitor: ActorLifetime.Worker<obj>)
+        =
+        { new IAsyncObserver<'TSource> with
+            member _.OnNextAsync x =
+                async {
+                    if context.Closed.Value = 0 then
+                        monitor.Actor.Post(box (ReactiveForwardedValue(box x)))
+                }
+
+            member _.OnErrorAsync err =
+                async {
+                    if context.Closed.Value = 0 then
+                        do! context.Downstream.OnErrorAsync err
+                }
+
+            member _.OnCompletedAsync() =
+                async {
+                    if context.Closed.Value = 0 then
+                        do! context.Downstream.OnCompletedAsync()
+                }
+        }
+
     /// For each upstream item, posts it to a supervised per-subscription actor.
     /// The actor emits downstream via an emit callback provided at spawn time.
     /// Terminal events bypass the actor and go directly to downstream.
@@ -47,162 +236,29 @@ module internal ActorInterop =
         let subscribeAsync (aobv: IAsyncObserver<'TResult>) =
             async {
                 let closed = ActorLifetime.Flag(0)
-                let monitorFailed = ActorLifetime.Flag(0)
-                let childCancellation = new System.Threading.CancellationTokenSource()
-                let cleanupTimeout = 5000
 
-                let output =
-                    ActorLifetime.spawn None ignore (fun inbox ->
-                        let rec loop () =
-                            actor {
-                                let! value = inbox.Receive()
-
-                                if closed.Value = 0 then
-                                    try
-                                        do! aobv.OnNextAsync value
-                                    with ex ->
-                                        do! aobv.OnErrorAsync ex
-
-                                return! loop ()
-                            }
-
-                        loop ())
-
-                let emit value =
-                    if closed.Value = 0 then
-                        output.Actor.Post value
-
-                // invariant: escalation never throws back into the unsupervised monitor
-                let escalate ex =
-                    async {
-                        if closed.Value = 0 then
-                            try
-                                do! aobv.OnErrorAsync ex
-                            with _ ->
-                                ()
+                let context =
+                    {
+                        Closed = closed
+                        MonitorFailed = ActorLifetime.Flag(0)
+                        ChildCancellation = new System.Threading.CancellationTokenSource()
+                        Output = spawnOutput closed aobv
+                        Downstream = aobv
+                        Decide = decide
+                        Handler = handler
                     }
 
-                let monitor =
-                    ActorLifetime.spawn None (fun _ -> monitorFailed.Set 1) (fun inbox ->
-                        Actor.trapExits ()
-
-                        let spawnChild () =
-                            ActorLifetime.spawnWithToken
-                                childCancellation.Token
-                                (Some inbox.Reference)
-                                (fun ex -> inbox.Post(box ({ Pid = null; Reason = box ex }: ChildExited)))
-                                (handler emit)
-
-                        let mutable child = spawnChild ()
-
-                        let rec loop () =
-                            actor {
-                                let! msg = inbox.Receive()
-
-                                match msg with
-                                | :? SupervisorStop -> ()
-                                | _ when closed.Value <> 0 -> return! loop ()
-                                | :? ForwardedValue as forwarded ->
-                                    let (ReactiveForwardedValue value) = forwarded
-                                    child.Actor.Post(unbox<'TSource> value)
-                                    return! loop ()
-                                | _ ->
-                                    match Actor.tryAsChildExited msg with
-                                    | Some exited ->
-                                        let ex =
-                                            match exited.Reason with
-                                            | :? exn as e -> e
-                                            | r -> ProcessExitException(sprintf "%A" r)
-
-                                        match decide ex with
-                                        | Directive.Escalate -> do! escalate ex
-                                        | Directive.Stop -> return! loop ()
-                                        | Directive.Restart ->
-                                            do! child.Stop cleanupTimeout
-
-                                            if closed.Value = 0 then
-                                                child <- spawnChild ()
-
-                                            return! loop ()
-                                    | None -> failwith "Unexpected supervised actor message"
-                            }
-
-                        actor {
-                            try
-                                do! loop ()
-                            with ex ->
-                                do! escalate ex
-
-                            try
-                                do! child.Stop cleanupTimeout
-                            with _ ->
-                                monitorFailed.Set 1
-                        })
-
-                let close () =
-                    closed.Set 1
-                    childCancellation.Cancel()
-
-                let stopMonitor () =
-                    async {
-                        monitor.Actor.Post(box SupervisorStop)
-
-                        try
-                            do!
-                                ActorLifetime.waitUntil
-                                    cleanupTimeout
-                                    "Supervisor did not acknowledge shutdown"
-                                    monitor.IsStopped
-                        with ex ->
-                            do! monitor.Stop cleanupTimeout
-                            return raise ex
-
-                        do! monitor.Stop cleanupTimeout
-
-                        if monitorFailed.Value <> 0 then
-                            failwith "Supervisor child cleanup failed"
-                    }
-
-                // decision: passes an explicit unit closure to disposal so Python does not call a partially applied function
-                let cleanup (sourceDisp: IReactiveDisposable) =
-                    ActorLifetime.cleanupAll
-                        [
-                            stopMonitor
-                            (fun () -> output.Stop cleanupTimeout)
-                            (fun () ->
-                                ActorLifetime.cleanupStep
-                                    cleanupTimeout
-                                    "Source disposal failed or timed out"
-                                    (sourceDisp.DisposeAsync()))
-                        ]
-
-                let obv =
-                    { new IAsyncObserver<'TSource> with
-                        member _.OnNextAsync x =
-                            async {
-                                if closed.Value = 0 then
-                                    monitor.Actor.Post(box (ReactiveForwardedValue(box x)))
-                            }
-
-                        member _.OnErrorAsync err =
-                            async {
-                                if closed.Value = 0 then
-                                    do! aobv.OnErrorAsync err
-                            }
-
-                        member _.OnCompletedAsync() =
-                            async {
-                                if closed.Value = 0 then
-                                    do! aobv.OnCompletedAsync()
-                            }
-                    }
+                let monitor = startSupervisedMonitor context
 
                 try
-                    let! sourceDisp = source.SubscribeAsync obv
-                    return ActorLifetime.disposable (cleanupTimeout * 4) close (fun () -> cleanup sourceDisp)
+                    let! sourceDisp = source.SubscribeAsync(supervisedObserver context monitor)
+
+                    return
+                        ActorLifetime.disposable (cleanupTimeout * 4) (fun () -> closeSupervision context) (fun () ->
+                            cleanupSupervision context monitor sourceDisp)
                 with ex ->
-                    close ()
-                    do! cleanup AsyncDisposable.Empty
+                    closeSupervision context
+                    do! cleanupSupervision context monitor AsyncDisposable.Empty
                     return raise ex
             }
 
