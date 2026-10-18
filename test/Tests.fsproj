@@ -18,6 +18,7 @@
     <Compile Include="FlatMapTest.fs" />
     <Compile Include="BuilderTest.fs" />
     <Compile Include="CatchTest.fs" />
+    <Compile Include="RetryTest.fs" />
     <Compile Include="ScanTest.fs" />
     <Compile Include="StatefulTest.fs" />
     <Compile Include="SubjectTest.fs" />

@@ -240,7 +240,7 @@ module Reactive =
     let catch (handler: exn -> IAsyncObservable<'a>) (source: IAsyncObservable<'a>) : IAsyncObservable<'a> =
         Transform.catch handler source
 
-    /// Retries the given Observable retryCount number of times.
+    /// Resubscribes after an error up to retryCount times for each subscription.
     let retry (retryCount: int) (source: IAsyncObservable<'a>) : IAsyncObservable<'a> =
         Transform.retry retryCount source
 
